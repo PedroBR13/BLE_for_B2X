@@ -1,6 +1,7 @@
 {
   "files.associations": {
     "cstdlib": "c",
-    "cstdint": "c"
+    "cstdint": "c",
+    "ble_module.h": "c"
   }
 }
