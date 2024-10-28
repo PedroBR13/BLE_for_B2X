@@ -1,10 +1,10 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <modem/nrf_modem_lib.h>
-#include <modem/lte_lc.h>
 #include <dk_buttons_and_leds.h>
 #include "gnss_module.h" // Include the GNSS module
 #include "ble_module.h"   // Include the BLE module
+#include "beacon_module.h"  // Include the BLE beacon module
 
 LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
 
@@ -18,10 +18,11 @@ uint32_t previous_runtime_ms = 0;
 typedef enum {
     STATE_GNSS_SEARCH,
     STATE_SCANNING,
+    STATE_ADVERTISING,
     STATE_DONE
 } app_state_t;
 
-static app_state_t current_state = STATE_GNSS_SEARCH;  // Initialize to GNSS search state
+static app_state_t current_state = STATE_SCANNING;  // Initialize to GNSS search state
 
 // Callback function for first GNSS fix
 void on_first_fix_acquired(void) {
@@ -64,25 +65,68 @@ int main(void) {
     k_timer_init(&timeout_timer, gnss_timeout_handler, NULL);
     k_timer_start(&timeout_timer, K_SECONDS(20), K_FOREVER);
 
+    err = bt_enable(NULL);
+    if (err) {
+        LOG_ERR("Bluetooth init failed (err %d)", err);
+        return err;
+    }
+    LOG_INF("Bluetooth initialized");
+
+    // Initialize and start Bluetooth advertising
+    err = advertising_module_init();
+    if (err) {
+        LOG_ERR("Advertising module init failed");
+        return err;
+    }
+
     // Main loop
-    while (current_state != STATE_DONE) {
-        if (current_state == STATE_SCANNING) {
-            // Initialize Bluetooth
-            err = ble_init();
-            if (err) {
-                return -1;
-            }
+    // while (current_state != STATE_DONE) {
+    while (true) {
+        switch (current_state) {
+            case STATE_SCANNING:
+                // Initialize and start Bluetooth scanning
+                err = ble_start_scanning();
+                if (err) {
+                    LOG_ERR("BLE scanning start failed");
+                    return err;
+                }
+                LOG_INF("Bluetooth scanning started");
 
-            // Start Bluetooth scanning
-            err = ble_start_scanning();
-            if (err) {
-                return -1;
-            }
+                // Simulate scanning duration
+                k_sleep(K_MSEC(500));
 
-            current_state = STATE_DONE;  // Indicate that we're done
+                // Stop scanning before transitioning to advertising
+                err = bt_le_scan_stop();
+                if (err) {
+                    LOG_ERR("Stopping scanning failed (err %d)\n", err);
+                    return err;
+                }
+
+                // Move to ADVERTISING state
+                current_state = STATE_ADVERTISING;
+                break;
+
+            case STATE_ADVERTISING:
+                err = advertising_start();
+                if (err) {
+                    LOG_ERR("Advertising start failed");
+                    return err;
+                }
+                LOG_INF("Bluetooth advertising started");
+
+                // Simulate advertising duration
+                k_sleep(K_MSEC(2000));
+
+                // After advertising, return to SCANNING state
+                current_state = STATE_SCANNING;
+                break;
+
+            default:
+                LOG_ERR("Unknown state");
+                return -1;
         }
 
-        // Simulate 1 ms delay
+        // Simulate 1 ms delay to prevent CPU overload
         k_sleep(K_MSEC(1));
     }
 
