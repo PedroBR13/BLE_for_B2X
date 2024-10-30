@@ -22,7 +22,7 @@ typedef enum {
     STATE_DONE
 } app_state_t;
 
-static app_state_t current_state = STATE_SCANNING;  // Initialize to GNSS search state
+static app_state_t current_state = STATE_ADVERTISING;  // Initialize to GNSS search state
 
 // Callback function for first GNSS fix
 void on_first_fix_acquired(void) {
