@@ -5,6 +5,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/gap.h>
+#include <zephyr/sys/ring_buffer.h>
 
 #define COMPANY_ID_CODE 0x0059
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME
@@ -20,5 +21,6 @@ typedef struct adv_mfg_data {
 
 int advertising_module_init(void);
 int advertising_start(void);
+int application_init(void);
 
 #endif // BEACON_MODULE_H

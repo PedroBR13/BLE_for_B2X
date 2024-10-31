@@ -72,6 +72,12 @@ int main(void) {
     }
     LOG_INF("Bluetooth initialized");
 
+    err = application_init();
+    if (err) {
+        LOG_ERR("Application init failed");
+        return err;
+    }
+
     // Initialize and start Bluetooth advertising
     err = advertising_module_init();
     if (err) {

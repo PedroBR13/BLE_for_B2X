@@ -11,17 +11,6 @@ LOG_MODULE_REGISTER(ble_module, LOG_LEVEL_INF);  // Separate logging module for 
 extern uint32_t runtime_ms;
 extern uint32_t previous_runtime_ms;
 
-// Initialize Bluetooth
-int ble_init(void) {
-    int err = bt_enable(NULL);
-    if (err) {
-        LOG_ERR("Bluetooth init failed (err %d)", err);
-        return err;
-    }
-    LOG_INF("Bluetooth initialized");
-    return 0;
-}
-
 // Start Bluetooth scanning
 int ble_start_scanning(void) {
     struct bt_le_scan_param scan_param = {
