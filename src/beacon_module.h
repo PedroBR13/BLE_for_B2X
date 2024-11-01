@@ -22,5 +22,7 @@ typedef struct adv_mfg_data {
 int advertising_module_init(void);
 int advertising_start(void);
 int application_init(void);
+bool get_adv_progress(void);
+int advertising_stop(void);
 
 #endif // BEACON_MODULE_H

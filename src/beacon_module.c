@@ -30,9 +30,16 @@ static const struct bt_data ad[] = {
     BT_DATA(BT_DATA_MANUFACTURER_DATA, (unsigned char *)&adv_mfg_data, sizeof(adv_mfg_data)),
 };
 
+static bool advertising_complete_flag = false; // Flag for advertising completion
+
+bool get_adv_progress(void) {
+    return advertising_complete_flag;
+}
+
 static void adv_sent_cb(struct bt_le_ext_adv *adv, struct bt_le_ext_adv_sent_info *info) {
     LOG_INF("Advertising stopped after %u events", info->num_sent);
-}
+    advertising_complete_flag = true;
+};
 
 static struct bt_le_ext_adv_cb adv_callbacks = {
     .sent = adv_sent_cb,
@@ -122,6 +129,20 @@ int advertising_start(void) {
 
     LOG_INF("Advertising started with updated packet content. Press count: %d, Sensor value: %d",
             adv_mfg_data.number_press[0], adv_mfg_data.sensor_data[0]);
+
+    return 0;
+}
+
+int advertising_stop(void) {
+    // Stop the advertising
+    int err = bt_le_ext_adv_stop(adv_set);
+    if (err) {
+        LOG_ERR("Failed to stop advertising (err %d)\n", err);
+        return err;
+    }
+
+    LOG_INF("Advertising stopped successfully.");
+    advertising_complete_flag = true; // Set the flag to indicate advertising has stopped
 
     return 0;
 }

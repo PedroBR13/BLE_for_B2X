@@ -57,6 +57,6 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type, struct net
         current_hour %= 24;
     }
 
-    LOG_INF("Device found: %s (RSSI %d) at %02u:%02u:%02u.%03u - runtime: %llu",
-            addr_str, rssi, current_hour, current_minute, current_second, current_ms, k_uptime_get());
+    // LOG_INF("Device found: %s (RSSI %d) at %02u:%02u:%02u.%03u - runtime: %llu",
+    //         addr_str, rssi, current_hour, current_minute, current_second, current_ms, k_uptime_get());
 }

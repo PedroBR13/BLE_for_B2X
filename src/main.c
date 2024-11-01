@@ -22,7 +22,7 @@ typedef enum {
     STATE_DONE
 } app_state_t;
 
-static app_state_t current_state = STATE_ADVERTISING;  // Initialize to GNSS search state
+static app_state_t current_state = STATE_DONE;  // Initialize to GNSS search state
 
 // Callback function for first GNSS fix
 void on_first_fix_acquired(void) {
@@ -42,28 +42,28 @@ static void gnss_timeout_handler(struct k_timer *timer_id) {
     LOG_INF("Hardcoded RTC time set to: %02u:%02u:%02u.%03u",
             rtc_time.hour, rtc_time.minute, rtc_time.second, rtc_time.ms);
 
-    current_state = STATE_SCANNING;
+    current_state = STATE_DONE;
 }
 
 int main(void) {
     int err;
 
-    dk_leds_init();
+    // dk_leds_init();
 
-    err = nrf_modem_lib_init();
-    if (err) {
-        LOG_ERR("Failed to initialize modem, error: %d", err);
-        return -1;
-    }
+    // err = nrf_modem_lib_init();
+    // if (err) {
+    //     LOG_ERR("Failed to initialize modem, error: %d", err);
+    //     return -1;
+    // }
 
-    // Setup GNSS with the first-fix callback
-    if (setup_gnss(on_first_fix_acquired) != 0) {
-        LOG_ERR("GNSS setup failed");
-        return -1;
-    }
+    // // Setup GNSS with the first-fix callback
+    // if (setup_gnss(on_first_fix_acquired) != 0) {
+    //     LOG_ERR("GNSS setup failed");
+    //     return -1;
+    // }
 
-    k_timer_init(&timeout_timer, gnss_timeout_handler, NULL);
-    k_timer_start(&timeout_timer, K_SECONDS(20), K_FOREVER);
+    // k_timer_init(&timeout_timer, gnss_timeout_handler, NULL);
+    // k_timer_start(&timeout_timer, K_SECONDS(20), K_FOREVER);
 
     err = bt_enable(NULL);
     if (err) {
@@ -86,7 +86,6 @@ int main(void) {
     }
 
     // Main loop
-    // while (current_state != STATE_DONE) {
     while (true) {
         switch (current_state) {
             case STATE_SCANNING:
@@ -96,10 +95,9 @@ int main(void) {
                     LOG_ERR("BLE scanning start failed");
                     return err;
                 }
-                LOG_INF("Bluetooth scanning started");
 
                 // Simulate scanning duration
-                k_sleep(K_MSEC(500));
+                k_sleep(K_MSEC(300));
 
                 // Stop scanning before transitioning to advertising
                 err = bt_le_scan_stop();
@@ -118,12 +116,19 @@ int main(void) {
                     LOG_ERR("Advertising start failed");
                     return err;
                 }
-                LOG_INF("Bluetooth advertising started");
 
-                // Simulate advertising duration
-                k_sleep(K_MSEC(2000));
+                // Wait here until advertising completes
+                while (!get_adv_progress()) {
+                    k_sleep(K_MSEC(10)); // Small delay to avoid CPU overuse
+                }
 
-                // After advertising, return to SCANNING state
+                advertising_stop();
+
+                current_state = STATE_SCANNING;
+                break;
+
+            case STATE_DONE:
+                LOG_INF("Process done. Going to scanning state");
                 current_state = STATE_SCANNING;
                 break;
 
