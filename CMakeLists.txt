@@ -10,7 +10,7 @@ target_sources(app PRIVATE src/main.c)
 
 # Add modules source file
 # target_sources(app PRIVATE src/gnss_module.c)
-target_sources(app PRIVATE src/gnss_module.c src/ble_module.c src/beacon_module.c)
+target_sources(app PRIVATE src/gnss_module.c src/scan_module.c src/beacon_module.c)
 
 # If you have a separate include directory for headers, you can add it like this:
 target_include_directories(app PRIVATE src)

@@ -4,7 +4,7 @@
 // #include <dk_buttons_and_leds.h>
 #include <zephyr/drivers/gpio.h>
 #include "gnss_module.h" // Include the GNSS module
-#include "ble_module.h"   // Include the BLE module
+#include "scan_module.h"   // Include the BLE module
 #include "beacon_module.h"  // Include the BLE beacon module
 
 LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module

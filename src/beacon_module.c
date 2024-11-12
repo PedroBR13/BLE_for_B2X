@@ -31,10 +31,15 @@ static const struct bt_data ad[] = {
 };
 
 static bool advertising_complete_flag = false; // Flag for advertising completion
+static bool update_availability_flag = true; // Flag for content availability
 
 bool get_adv_progress(void) {
     return advertising_complete_flag;
 }
+
+// bool check_update_availability(void) {
+//     return update_availability_flag;
+// }
 
 static void adv_sent_cb(struct bt_le_ext_adv *adv, struct bt_le_ext_adv_sent_info *info) {
     LOG_INF("Advertising stopped after %u events", info->num_sent);
@@ -56,6 +61,7 @@ static void generate_packet_data(struct k_timer *dummy) {
     // Add packet data to the queue
     if (ring_buf_put(&packet_queue, (uint8_t *)&new_packet, sizeof(new_packet)) != sizeof(new_packet)) {
         LOG_WRN("Packet queue is full. Dropping packet.");
+
     } else {
         LOG_INF("Generated new packet data with press count %d and sensor value %d",
                  new_packet.press_count, new_packet.sensor_value);
@@ -102,46 +108,54 @@ int advertising_start(void) {
 
     // Check if there is data in the queue
     if (ring_buf_get(&packet_queue, (uint8_t *)&current_packet, len) != len) {
-        LOG_WRN("No new packet data in the queue. Using previous data.");
+        LOG_WRN("No new packet data in the queue. Back to scanning mode.");
+        update_availability_flag = false;
+        advertising_complete_flag = true;
     } else {
         // Update adv_mfg_data with new packet content from the queue
         adv_mfg_data.number_press[0] = current_packet.press_count;
         adv_mfg_data.sensor_data[0] = current_packet.sensor_value;
+        update_availability_flag = true;
     }
 
-    struct bt_le_ext_adv_start_param start_param = {
-        .timeout = 0,
-        .num_events = PACKET_COPIES
-    };
+    if (update_availability_flag) {
+        struct bt_le_ext_adv_start_param start_param = {
+            .timeout = 0,
+            .num_events = PACKET_COPIES
+        };
 
-    // Start advertising with the updated data
-    int err = bt_le_ext_adv_set_data(adv_set, ad, ARRAY_SIZE(ad), NULL, 0);
-    if (err) {
-        LOG_ERR("Failed to set advertising data (err %d)\n", err);
-        return err;
+        // Start advertising with the updated data
+        int err = bt_le_ext_adv_set_data(adv_set, ad, ARRAY_SIZE(ad), NULL, 0);
+        if (err) {
+            LOG_ERR("Failed to set advertising data (err %d)\n", err);
+            return err;
+        }
+
+        err = bt_le_ext_adv_start(adv_set, &start_param);
+        if (err) {
+            LOG_ERR("Failed to start advertising (err %d)\n", err);
+            return err;
+        }
+
+        LOG_INF("Advertising started with updated packet content. Press count: %d, Sensor value: %d",
+                adv_mfg_data.number_press[0], adv_mfg_data.sensor_data[0]);
     }
-
-    err = bt_le_ext_adv_start(adv_set, &start_param);
-    if (err) {
-        LOG_ERR("Failed to start advertising (err %d)\n", err);
-        return err;
-    }
-
-    LOG_INF("Advertising started with updated packet content. Press count: %d, Sensor value: %d",
-            adv_mfg_data.number_press[0], adv_mfg_data.sensor_data[0]);
 
     return 0;
 }
 
 int advertising_stop(void) {
     // Stop the advertising
-    int err = bt_le_ext_adv_stop(adv_set);
-    if (err) {
-        LOG_ERR("Failed to stop advertising (err %d)\n", err);
-        return err;
-    }
+    if (update_availability_flag) {
+        int err = bt_le_ext_adv_stop(adv_set);
+            if (err) {
+                LOG_ERR("Failed to stop advertising (err %d)\n", err);
+                return err;
+            }
 
-    LOG_INF("Advertising stopped successfully.");
+            LOG_INF("Advertising stopped successfully.");
+    }
+    
     advertising_complete_flag = true; // Set the flag to indicate advertising has stopped
 
     return 0;

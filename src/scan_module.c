@@ -1,9 +1,9 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
-#include "ble_module.h"
+#include "scan_module.h"
 #include "gnss_module.h"
 
-LOG_MODULE_REGISTER(ble_module, LOG_LEVEL_INF);  // Separate logging module for Bluetooth
+LOG_MODULE_REGISTER(scan_module, LOG_LEVEL_INF);  // Separate logging module for Bluetooth
 
 #define SCAN_INTERVAL 0x0010
 #define SCAN_WINDOW 0x0010
