@@ -1,12 +1,18 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <modem/nrf_modem_lib.h>
-#include <dk_buttons_and_leds.h>
+// #include <dk_buttons_and_leds.h>
+#include <zephyr/drivers/gpio.h>
 #include "gnss_module.h" // Include the GNSS module
 #include "ble_module.h"   // Include the BLE module
 #include "beacon_module.h"  // Include the BLE beacon module
 
 LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
+
+/* The devicetree node identifier for the "led0" alias. */
+#define LED0_NODE DT_ALIAS(led0)
+
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 // Timers
 static struct k_timer timeout_timer;
@@ -22,7 +28,7 @@ typedef enum {
     STATE_DONE
 } app_state_t;
 
-static app_state_t current_state = STATE_DONE;  // Initialize to GNSS search state
+static app_state_t current_state = STATE_SCANNING;  // Initialize to GNSS search state
 
 // Callback function for first GNSS fix
 void on_first_fix_acquired(void) {
@@ -47,8 +53,19 @@ static void gnss_timeout_handler(struct k_timer *timer_id) {
 
 int main(void) {
     int err;
+    LOG_INF("Starting B2B device...");
 
     // dk_leds_init();
+
+    int ret;
+    if (!gpio_is_ready_dt(&led)) {
+		return 0;
+	}
+
+	ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
+	if (ret < 0) {
+		return 0;
+	}
 
     // err = nrf_modem_lib_init();
     // if (err) {
@@ -97,7 +114,7 @@ int main(void) {
                 }
 
                 // Simulate scanning duration
-                k_sleep(K_MSEC(300));
+                k_sleep(K_MSEC(1000));
 
                 // Stop scanning before transitioning to advertising
                 err = bt_le_scan_stop();
@@ -106,7 +123,7 @@ int main(void) {
                     return err;
                 }
 
-                // Move to ADVERTISING state
+                // // Move to ADVERTISING state
                 current_state = STATE_ADVERTISING;
                 break;
 
