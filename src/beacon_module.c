@@ -31,15 +31,15 @@ static const struct bt_data ad[] = {
 };
 
 static bool advertising_complete_flag = false; // Flag for advertising completion
-static bool update_availability_flag = true; // Flag for content availability
+static bool update_availability_flag = false; // Flag for content availability
 
 bool get_adv_progress(void) {
     return advertising_complete_flag;
 }
 
-// bool check_update_availability(void) {
-//     return update_availability_flag;
-// }
+bool check_update_availability(void) {
+    return update_availability_flag;
+}
 
 static void adv_sent_cb(struct bt_le_ext_adv *adv, struct bt_le_ext_adv_sent_info *info) {
     LOG_INF("Advertising stopped after %u events", info->num_sent);
@@ -66,6 +66,9 @@ static void generate_packet_data(struct k_timer *dummy) {
         LOG_INF("Generated new packet data with press count %d and sensor value %d",
                  new_packet.press_count, new_packet.sensor_value);
     }
+
+    // notify availability of data
+    update_availability_flag = true;
 }
 
 // Initialize the timer for packet generation
@@ -115,7 +118,6 @@ int advertising_start(void) {
         // Update adv_mfg_data with new packet content from the queue
         adv_mfg_data.number_press[0] = current_packet.press_count;
         adv_mfg_data.sensor_data[0] = current_packet.sensor_value;
-        update_availability_flag = true;
     }
 
     if (update_availability_flag) {
@@ -148,12 +150,13 @@ int advertising_stop(void) {
     // Stop the advertising
     if (update_availability_flag) {
         int err = bt_le_ext_adv_stop(adv_set);
-            if (err) {
-                LOG_ERR("Failed to stop advertising (err %d)\n", err);
-                return err;
-            }
+        if (err) {
+            LOG_ERR("Failed to stop advertising (err %d)\n", err);
+            return err;
+        }
 
-            LOG_INF("Advertising stopped successfully.");
+        LOG_INF("Advertising stopped successfully.");
+        update_availability_flag = false;
     }
     
     advertising_complete_flag = true; // Set the flag to indicate advertising has stopped

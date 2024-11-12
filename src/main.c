@@ -115,6 +115,12 @@ int main(void) {
 
                 // Simulate scanning duration
                 k_sleep(K_MSEC(1000));
+                
+                // keep scanning if no available data to send
+                while (!check_update_availability()) {
+                    // LOG_INF("Scan interval reset due to no data to send. \n");
+                    k_sleep(K_MSEC(1000));
+                }
 
                 // Stop scanning before transitioning to advertising
                 err = bt_le_scan_stop();
@@ -123,7 +129,7 @@ int main(void) {
                     return err;
                 }
 
-                // // Move to ADVERTISING state
+                // Move to ADVERTISING state
                 current_state = STATE_ADVERTISING;
                 break;
 
