@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <zephyr/random/random.h>
 #include "beacon_module.h"
 #include "gnss_module.h"
 
@@ -29,6 +30,7 @@ extern uint32_t previous_runtime_ms;
 RING_BUF_DECLARE(packet_queue, PACKET_QUEUE_SIZE * sizeof(struct packet_content));
 
 static struct k_timer packet_gen_timer;
+static struct k_work packet_work;
 
 static struct bt_le_ext_adv *adv_set;
 static const struct bt_data ad[] = {
@@ -58,6 +60,12 @@ static struct bt_le_ext_adv_cb adv_callbacks = {
     .sent = adv_sent_cb,
 };
 
+uint32_t random_delay(uint32_t min_ms, uint32_t max_ms) {
+    uint32_t delay = min_ms + (sys_rand32_get() % (max_ms - min_ms + 1));
+    k_sleep(K_MSEC(delay));
+		return delay;
+}
+
 // Function to get current time as a formatted string without hour
 static char* get_current_time_string(void) {
     runtime_ms = k_uptime_get_32() - previous_runtime_ms;
@@ -82,12 +90,15 @@ static char* get_current_time_string(void) {
 }
 
 // Function to generate and enqueue new packet data
-static void generate_packet_data(struct k_timer *dummy) {
+static void delayed_packet_enqueue(struct k_work *work) {
     struct packet_content new_packet;
 
     // Populate packet content
     new_packet.tx_delay = k_uptime_get_32();  // Implement this function to get sensor data
     new_packet.press_count = adv_mfg_data.number_press[0] + 1;
+
+    // Simulate network layer delay
+    random_delay(11, 20);
 
     // Add packet data to the queue
     if (ring_buf_put(&packet_queue, (uint8_t *)&new_packet, sizeof(new_packet)) != sizeof(new_packet)) {
@@ -119,8 +130,13 @@ static void generate_packet_data(struct k_timer *dummy) {
     update_availability_flag = true;
 }
 
+static void generate_packet_data(struct k_timer *dummy) {
+    k_work_submit(&packet_work);  // Schedule work to handle delay and queue
+}
+
 // Initialize the timer for packet generation
 int application_init(void) {
+    k_work_init(&packet_work, delayed_packet_enqueue); // Initialize work item
     k_timer_init(&packet_gen_timer, generate_packet_data, NULL);
     k_timer_start(&packet_gen_timer, PACKET_GEN_INTERVAL, PACKET_GEN_INTERVAL);
     return 0;
