@@ -12,6 +12,8 @@ LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
 /* The devicetree node identifier for the "led0" alias. */
 #define LED0_NODE DT_ALIAS(led0)
 
+#define SCAN_WINDOW 50
+
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 // Timers
@@ -114,12 +116,12 @@ int main(void) {
                 }
 
                 // Simulate scanning duration
-                k_sleep(K_MSEC(1000));
+                k_sleep(K_MSEC(SCAN_WINDOW));
                 
                 // keep scanning if no available data to send
                 while (!check_update_availability()) {
                     // LOG_INF("Scan interval reset due to no data to send. \n");
-                    k_sleep(K_MSEC(1000));
+                    k_sleep(K_MSEC(SCAN_WINDOW));
                 }
 
                 // Stop scanning before transitioning to advertising
@@ -151,7 +153,7 @@ int main(void) {
                 break;
 
             case STATE_DONE:
-                LOG_INF("Process done. Going to scanning state");
+                // LOG_INF("Process done. Going to scanning state");
                 current_state = STATE_SCANNING;
                 break;
 

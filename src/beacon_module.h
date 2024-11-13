@@ -13,10 +13,10 @@
 #define RUN_INTERVAL 30000
 
 typedef struct adv_mfg_data {
-    uint8_t company_code[2];
+    uint16_t company_code[2];
     uint16_t number_press[2];
-    char hello_message[10];
-    uint16_t sensor_data[2];
+    char timestamp[10];
+    uint8_t tx_delay[2];
 } adv_mfg_data_type;
 
 int advertising_module_init(void);
