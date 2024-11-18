@@ -49,9 +49,9 @@ static void parse_advertisement_data(const uint8_t *data, int len, char **name, 
 static char* get_current_time_string(void) {
     runtime_ms = k_uptime_get() - previous_runtime_ms;
     uint32_t total_ms = rtc_time.ms + runtime_ms;
-    uint8_t current_hour = rtc_time.hour;
-    uint8_t current_minute = rtc_time.minute;
-    uint8_t current_second = rtc_time.second + total_ms / 1000;
+    uint16_t current_hour = rtc_time.hour;
+    uint16_t current_minute = rtc_time.minute;
+    uint16_t current_second = rtc_time.second + total_ms / 1000;
     uint16_t current_ms = total_ms % 1000;
 
     // Adjust time for overflow handling
@@ -69,7 +69,7 @@ static char* get_current_time_string(void) {
 
     // Allocate memory for the time string and format it
     static char time_string[16]; // Enough space for "HH:MM:SS.mmm\0"
-    snprintf(time_string, 16, "%02u:%02u:%02u.%03u", current_hour, current_minute, current_second, current_ms);
+    snprintf(time_string, 16, "%02u:%02u.%03u", current_minute, current_second, current_ms);
     
     return time_string;
 }
@@ -132,7 +132,7 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
             // LOG_INF("Hello message: %s\n", hello_message);
             // LOG_INF("Sensor data: %u\n", sensor_data);
 
-            LOG_INF("%s - %s - press: %u - sent_timestamp: %s - tx_delay: %u", 
+            LOG_INF("%s %s %u %s %u", 
             time_str, addr_str, number_press, timestamp, tx_delay);
 
             } else {

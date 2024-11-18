@@ -70,8 +70,8 @@ uint32_t random_delay(uint32_t min_ms, uint32_t max_ms) {
 static char* get_current_time_string(void) {
     runtime_ms = k_uptime_get_32() - previous_runtime_ms;
     uint32_t total_ms = rtc_time.ms + runtime_ms;
-    uint8_t current_minute = rtc_time.minute;
-    uint8_t current_second = rtc_time.second + total_ms / 1000;
+    uint16_t current_minute = rtc_time.minute;
+    uint16_t current_second = rtc_time.second + total_ms / 1000;
     uint16_t current_ms = total_ms % 1000;
 
     // Adjust time for overflow handling
@@ -86,6 +86,7 @@ static char* get_current_time_string(void) {
     // Allocate memory for the time string and format it
     static char time_string[10]; // Enough space for "MM:SS.mmm\0"
     snprintf(time_string, 10, "%02u:%02u.%03u", current_minute, current_second, current_ms);
+    // LOG_INF("total_ms: %u / rtc_time.ms: %u /runtime_ms:  %u /current_minute: %u",total_ms,rtc_time.ms,runtime_ms, current_minute);
     return time_string;
 }
 

@@ -11,7 +11,7 @@ menu "cellfund Lesson 6 Exercise"
 config GNSS_PERIODIC_INTERVAL
 	int "Fix interval for periodic GPS fixes"
 	range 10 65535
-	default 60
+	default 10
 	help
 	  Fix interval (in seconds) for periodic fixes.
 
