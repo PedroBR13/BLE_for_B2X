@@ -4,7 +4,6 @@
 #include "gnss_module.h"
 
 #define PACKET_COPIES 3
-#define PACKET_QUEUE_SIZE 20  // Define the size of the queue
 #define PACKET_GEN_INTERVAL K_MSEC(200)  // Frequency X in seconds
 #define ADV_INTERVAL 32 // 20ms
 
@@ -26,8 +25,8 @@ struct packet_content {
 extern uint32_t runtime_ms;
 extern uint32_t previous_runtime_ms;
 
-// Queue buffer and ring buffer struct
-RING_BUF_DECLARE(packet_queue, PACKET_QUEUE_SIZE * sizeof(struct packet_content));
+static struct packet_content current_packet; // Single-packet buffer
+static bool packet_pending = false; // Indicates if a packet is waiting to be served
 
 static struct k_timer packet_gen_timer;
 static struct k_work packet_work;
@@ -41,8 +40,6 @@ static const struct bt_data ad[] = {
 
 static bool advertising_complete_flag = false; // Flag for advertising completion
 static bool update_availability_flag = false; // Flag for content availability
-static int consecutive_full_counter = 0;
-
 bool get_adv_progress(void) {
     return advertising_complete_flag;
 }
@@ -54,6 +51,8 @@ bool check_update_availability(void) {
 static void adv_sent_cb(struct bt_le_ext_adv *adv, struct bt_le_ext_adv_sent_info *info) {
     // LOG_INF("Advertising stopped after %u events", info->num_sent);
     advertising_complete_flag = true;
+    update_availability_flag = false; // Reset availability after advertising
+    packet_pending = false; // Mark packet as processed
 };
 
 static struct bt_le_ext_adv_cb adv_callbacks = {
@@ -92,42 +91,20 @@ static char* get_current_time_string(void) {
 
 // Function to generate and enqueue new packet data
 static void delayed_packet_enqueue(struct k_work *work) {
-    struct packet_content new_packet;
+    if (packet_pending) {
+        // LOG_WRN("Packet dropped: A previous packet is still being processed.");
+        return;
+    }
 
-    // Populate packet content
-    new_packet.tx_delay = k_uptime_get_32();  // Implement this function to get sensor data
-    new_packet.press_count = adv_mfg_data.number_press[0] + 1;
+    // Populate new packet content
+    current_packet.tx_delay = k_uptime_get_32();
+    current_packet.press_count = adv_mfg_data.number_press[0] + 1;
 
     // Simulate network layer delay
     random_delay(11, 20);
 
-    // Add packet data to the queue
-    if (ring_buf_put(&packet_queue, (uint8_t *)&new_packet, sizeof(new_packet)) != sizeof(new_packet)) {
-        LOG_WRN("Packet queue is full. Dropping packet.");
-
-        // Increment the consecutive full counter
-        consecutive_full_counter++;
-
-        // Check if the queue has been full MAX_CONSECUTIVE_FULL times in a row
-        if (consecutive_full_counter >= 4) {
-            LOG_WRN("Queue full %d times in a row. Resetting queue.", 4);
-
-            // Reset the queue
-            ring_buf_reset(&packet_queue);
-
-            // Reset the counter
-            consecutive_full_counter = 0;
-        }
-
-    } else {
-        // LOG_INF("Generated new packet data with press count %d and sensor value %d",
-        //          new_packet.press_count, new_packet.sensor_value);
-
-        // Successfully added packet to the queue, reset the full counter
-        consecutive_full_counter = 0;
-    }
-
-    // notify availability of data
+    // Mark the packet as ready to be advertised
+    packet_pending = true;
     update_availability_flag = true;
 }
 
@@ -161,60 +138,53 @@ int advertising_module_init(void) {
         return 0;
     }
 
-    err = bt_le_ext_adv_set_data(adv_set, ad, ARRAY_SIZE(ad), NULL, 0);
-    if (err) {
-        LOG_ERR("Failed to set extended advertising data (err %d)\n", err);
-        return 0;
-    }
+    // err = bt_le_ext_adv_set_data(adv_set, ad, ARRAY_SIZE(ad), NULL, 0);
+    // if (err) {
+    //     LOG_ERR("Failed to set extended advertising data (err %d)\n", err);
+    //     return 0;
+    // }
 
     return 0;
 }
 
 int advertising_start(void) {
-    struct packet_content current_packet;
-    uint32_t len = sizeof(current_packet);
-
-    // Check if there is data in the queue
-    if (!update_availability_flag || ring_buf_get(&packet_queue, (uint8_t *)&current_packet, len) != len) {
-        LOG_WRN("No new packet data in the queue. Back to scanning mode.");
-        update_availability_flag = false;
+    if (!packet_pending) {
+        LOG_WRN("No packet available to advertise. Back to scanning mode.");
         advertising_complete_flag = true;
+        return 0;
+    }
+
+    // Update adv_mfg_data with the current packet content
+    adv_mfg_data.number_press[0] = current_packet.press_count;
+    adv_mfg_data.tx_delay[0] = k_uptime_get_32() - current_packet.tx_delay;
+
+    char *time_string = get_current_time_string();
+    if (time_string) {
+        snprintf(adv_mfg_data.timestamp, sizeof(adv_mfg_data.timestamp), "%s", time_string);
     } else {
-        // Update adv_mfg_data with new packet content from the queue
-        adv_mfg_data.number_press[0] = current_packet.press_count;
-        adv_mfg_data.tx_delay[0] = k_uptime_get_32() - current_packet.tx_delay; // delay between generation and transmission
-
-        // Get current time string and set it in hello_message - TIMESTAMP OF MGS TRANSMISSION
-        char *time_string = get_current_time_string();
-        if (time_string) {
-            snprintf(adv_mfg_data.timestamp, sizeof(adv_mfg_data.timestamp), "%s", time_string);
-        } else {
-            LOG_ERR("Failed to allocate memory for timestamp string.");
-        }
+        LOG_ERR("Failed to allocate memory for timestamp string.");
     }
 
-    if (update_availability_flag) {
-        struct bt_le_ext_adv_start_param start_param = {
-            .timeout = 0,
-            .num_events = PACKET_COPIES
-        };
+    struct bt_le_ext_adv_start_param start_param = {
+        .timeout = 0,
+        .num_events = PACKET_COPIES
+    };
 
-        // Start advertising with the updated data
-        int err = bt_le_ext_adv_set_data(adv_set, ad, ARRAY_SIZE(ad), NULL, 0);
-        if (err) {
-            LOG_ERR("Failed to set advertising data (err %d)\n", err);
-            return err;
-        }
-
-        err = bt_le_ext_adv_start(adv_set, &start_param);
-        if (err) {
-            LOG_ERR("Failed to start advertising (err %d)\n", err);
-            return err;
-        }
-
-        // LOG_INF("Advertising started with updated packet content. Press count: %d, Sensor value: %d",
-        //         adv_mfg_data.number_press[0], adv_mfg_data.sensor_data[0]);
+    int err = bt_le_ext_adv_set_data(adv_set, ad, ARRAY_SIZE(ad), NULL, 0);
+    if (err) {
+        LOG_ERR("Failed to set advertising data (err %d)\n", err);
+        return err;
     }
+
+    err = bt_le_ext_adv_start(adv_set, &start_param);
+    if (err) {
+        LOG_ERR("Failed to start advertising (err %d)\n", err);
+        return err;
+    }
+
+
+    // LOG_INF("Advertising started with updated packet content. Press count: %d",
+    //         adv_mfg_data.number_press[0]);
 
     return 0;
 }
@@ -233,6 +203,7 @@ int advertising_stop(void) {
     }
     
     advertising_complete_flag = true; // Set the flag to indicate advertising has stopped
+    packet_pending = false;
 
     return 0;
 }
