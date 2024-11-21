@@ -11,12 +11,22 @@ LOG_MODULE_REGISTER(scan_module, LOG_LEVEL_INF);  // Separate logging module for
 extern uint32_t runtime_ms;
 extern uint32_t previous_runtime_ms;
 
+// typedef struct adv_mfg_data {
+// 	uint16_t company_code[2]; /* Company Identifier Code. */
+// 	uint16_t  number_press[2]; /* Number of times Button 1 is pressed */
+// 	char timestamp[10];      /* "Hello" message */
+// 	uint8_t  tx_delay[2];    /* Example sensor data */
+// } adv_mfg_data_type;
+
 typedef struct adv_mfg_data {
-	uint16_t company_code[2]; /* Company Identifier Code. */
-	uint16_t  number_press[2]; /* Number of times Button 1 is pressed */
-	char timestamp[10];      /* "Hello" message */
-	uint8_t  tx_delay[2];    /* Example sensor data */
+    uint16_t company_code[2];    // 2 bytes (2 * uint16_t)
+    uint16_t number_press[1];    // 2 bytes (2 * uint16_t)
+    // char timestamp[10];          // 10 bytes (char array, assuming ASCII)
+    uint8_t tx_delay[1];         // 2 bytes (2 * uint8_t)
+    uint32_t latitude[1];            // 4 bytes (scaled integer for latitude)
+    uint32_t longitude[1];           // 4 bytes (scaled integer for longitude)
 } adv_mfg_data_type;
+
 
 static void parse_advertisement_data(const uint8_t *data, int len, char **name, const uint8_t **manufacturer_data, int *manufacturer_data_len) {
     while (len > 0) {
@@ -121,27 +131,37 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
             adv_mfg_data_type *data = (adv_mfg_data_type *)manufacturer_data;
 
             uint16_t company_code = (data->company_code[1] << 8) | data->company_code[0];
-            uint16_t number_press = (data->number_press[1] << 8) | data->number_press[0];
-            char timestamp[11];
-            memcpy(timestamp, data->timestamp, sizeof(data->timestamp));
-            timestamp[sizeof(data->timestamp)] = '\0';
-            uint16_t tx_delay = (data->tx_delay[1] << 8) | data->tx_delay[0];
+            uint16_t number_press = data->number_press[0];
+            // char timestamp[11];
+            // memcpy(timestamp, data->timestamp, sizeof(data->timestamp));
+            // timestamp[sizeof(data->timestamp)] = '\0';
+            uint16_t tx_delay = data->tx_delay[0];
+            // uint32_t latitude = data->latitude;
+            uint32_t longitude = data->longitude[0];
 
-            // LOG_INF("Manufacturer ID: 0x%04x\n", company_code);
-            // LOG_INF("Number of presses: %u\n", number_press);
-            // LOG_INF("Hello message: %s\n", hello_message);
-            // LOG_INF("Sensor data: %u\n", sensor_data);
+             // Raw byte values for latitude
+            uint32_t raw_latitude[4];
+            memcpy(raw_latitude, &data->latitude[0], sizeof(raw_latitude));
+            // Print raw byte values of latitude
+            // LOG_INF("Raw Latitude Bytes: 0x%02X 0x%02X 0x%02X 0x%02X", raw_latitude[0], raw_latitude[1], raw_latitude[2], raw_latitude[3]);
+            // Convert raw bytes to uint32_t
+            uint32_t latitude = data->latitude[0];
 
-            LOG_INF("%s %s %u %s %u", 
-            time_str, addr_str, number_press, timestamp, tx_delay);
+            // LOG_INF("%s %s %u %s %u", 
+            // time_str, addr_str, number_press, timestamp, tx_delay);
+
+            LOG_INF("%s %s %u %u %u %u", 
+            time_str, addr_str, number_press, tx_delay, latitude, longitude);
 
             } else {
-                LOG_INF("Invalid manufacturer-specific data length\n");
+                // LOG_INF("Invalid manufacturer-specific data length\n");
+                LOG_INF("Invalid manufacturer data length: %d (expected %d)", manufacturer_data_len, sizeof(adv_mfg_data_type));
             }
 		
 	}
 
 	if (name) {
-			free(name);
+        free(name);
+        name = NULL;
 	}
 }

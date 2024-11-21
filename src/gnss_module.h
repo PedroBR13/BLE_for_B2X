@@ -11,8 +11,15 @@ struct rtc_time_s {
     uint16_t ms;
 };
 
+// RTC structure
+struct gnss_s {
+    uint32_t latitude;  
+    uint32_t longitude;
+};
+
 // Extern declaration so it can be accessed from other files
 extern struct rtc_time_s rtc_time;
+extern struct gnss_s last_gnss_data;
 
 // GNSS-related function declarations
 typedef void (*gnss_fix_callback_t)(void);  // Define callback type

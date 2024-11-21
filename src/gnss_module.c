@@ -14,6 +14,7 @@ static gnss_fix_callback_t fix_cb;  // Callback for first fix
 
 // Structure to hold current RTC time
 struct rtc_time_s rtc_time;
+struct gnss_s last_gnss_data = {52243187,6856186};
 static uint32_t previous_runtime_ms = 0;
 
 // GNSS event handler
@@ -48,10 +49,15 @@ static void gnss_event_handler(int event) {
                     first_fix = true;
                     update_rtc_from_gnss();
                     LOG_INF("First fix acquired.");
+                    LOG_INF("Latitude:       %f", pvt_data.latitude);
+                    LOG_INF("Longitude:      %f", pvt_data.longitude);
+                    LOG_INF("Altitude:       %.01f m", pvt_data.altitude);
 
                     if (fix_cb) {
                         fix_cb();  // Call the callback function to notify the main app
                     }
+                } else {
+                    update_rtc_from_gnss();
                 }
             }
             break;
@@ -86,8 +92,12 @@ void update_rtc_from_gnss(void) {
     rtc_time.second = pvt_data.datetime.seconds;
     rtc_time.ms = pvt_data.datetime.ms;
 
-    LOG_INF("RTC updated from GNSS: %02u:%02u:%02u.%03u", 
-            rtc_time.hour, rtc_time.minute, rtc_time.second, rtc_time.ms);
+    // Store the latest latitude and longitude in the gnss_data structure
+    last_gnss_data.latitude = (uint32_t)(pvt_data.latitude * 1000000);
+    last_gnss_data.longitude = (uint32_t)(pvt_data.longitude * 1000000);
+
+    LOG_INF("RTC updated from GNSS: %02u:%02u:%02u.%03u - Coordinates: %u, %u", 
+            rtc_time.hour, rtc_time.minute, rtc_time.second, rtc_time.ms, last_gnss_data.latitude, last_gnss_data.longitude);
 
     dk_set_led_on(DK_LED1); // Indicate fix acquisition with LED
 }
@@ -111,7 +121,7 @@ int setup_gnss(gnss_fix_callback_t fix_callback) {
         return err;
     }
 
-    err = nrf_modem_gnss_fix_interval_set(1);
+    err = nrf_modem_gnss_fix_interval_set(10);
     if (err) {
         LOG_ERR("Failed to set GNSS fix interval");
         return err;

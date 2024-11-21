@@ -9,11 +9,18 @@
 
 LOG_MODULE_REGISTER(beacon_module, LOG_LEVEL_INF);
 
+// static adv_mfg_data_type adv_mfg_data = {
+//     .company_code = {COMPANY_ID_CODE & 0xFF, COMPANY_ID_CODE >> 8},
+//     .number_press = {0, 0},
+//     .timestamp = "hello scan",
+//     .tx_delay = {0, 0}
+// };
 static adv_mfg_data_type adv_mfg_data = {
     .company_code = {COMPANY_ID_CODE & 0xFF, COMPANY_ID_CODE >> 8},
     .number_press = {0, 0},
-    .timestamp = "hello scan",
-    .tx_delay = {0, 0}
+    .tx_delay = {0, 0},
+    .latitude = {0,0},
+    .longitude = {0,0}
 };
 
 struct packet_content {
@@ -157,13 +164,23 @@ int advertising_start(void) {
     // Update adv_mfg_data with the current packet content
     adv_mfg_data.number_press[0] = current_packet.press_count;
     adv_mfg_data.tx_delay[0] = k_uptime_get_32() - current_packet.tx_delay;
+    adv_mfg_data.latitude[0] = last_gnss_data.latitude;
+    adv_mfg_data.longitude[0] = last_gnss_data.longitude;
 
-    char *time_string = get_current_time_string();
-    if (time_string) {
-        snprintf(adv_mfg_data.timestamp, sizeof(adv_mfg_data.timestamp), "%s", time_string);
-    } else {
-        LOG_ERR("Failed to allocate memory for timestamp string.");
-    }
+    // Debug log to show packet content and its size
+    // LOG_INF("Advertising packet content:");
+    // LOG_INF("  Press count: %d (Size: %zu bytes)", adv_mfg_data.number_press[0], sizeof(adv_mfg_data.number_press));
+    // LOG_INF("  TX delay: %d (Size: %zu bytes)", adv_mfg_data.tx_delay[0], sizeof(adv_mfg_data.tx_delay));
+    // LOG_INF("  Latitude: %d (Size: %zu bytes)", adv_mfg_data.latitude[0], sizeof(adv_mfg_data.latitude));
+    // LOG_INF("  Longitude: %d (Size: %zu bytes)", adv_mfg_data.longitude[0], sizeof(adv_mfg_data.longitude));
+    // LOG_INF("Total packet size: %zu bytes", sizeof(adv_mfg_data));
+
+    // char *time_string = get_current_time_string();
+    // if (time_string) {
+    //     snprintf(adv_mfg_data.timestamp, sizeof(adv_mfg_data.timestamp), "%s", time_string);
+    // } else {
+    //     LOG_ERR("Failed to allocate memory for timestamp string.");
+    // }
 
     struct bt_le_ext_adv_start_param start_param = {
         .timeout = 0,
