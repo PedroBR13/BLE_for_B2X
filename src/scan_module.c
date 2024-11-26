@@ -11,17 +11,10 @@ LOG_MODULE_REGISTER(scan_module, LOG_LEVEL_INF);  // Separate logging module for
 extern uint32_t runtime_ms;
 extern uint32_t previous_runtime_ms;
 
-// typedef struct adv_mfg_data {
-// 	uint16_t company_code[2]; /* Company Identifier Code. */
-// 	uint16_t  number_press[2]; /* Number of times Button 1 is pressed */
-// 	char timestamp[10];      /* "Hello" message */
-// 	uint8_t  tx_delay[2];    /* Example sensor data */
-// } adv_mfg_data_type;
-
 typedef struct adv_mfg_data {
-    uint16_t company_code[2];    // 2 bytes (2 * uint16_t)
+    // uint16_t company_code[2];    // 2 bytes (2 * uint16_t)
     uint16_t number_press[1];    // 2 bytes (2 * uint16_t)
-    // char timestamp[10];          // 10 bytes (char array, assuming ASCII)
+    uint32_t timestamp[1];          // 4 bytes 
     uint8_t tx_delay[1];         // 2 bytes (2 * uint8_t)
     uint32_t latitude[1];            // 4 bytes (scaled integer for latitude)
     uint32_t longitude[1];           // 4 bytes (scaled integer for longitude)
@@ -55,10 +48,13 @@ static void parse_advertisement_data(const uint8_t *data, int len, char **name, 
     }
 }
 
-// Function to get current time as a formatted string
-static char* get_current_time_string(void) {
+// Function to get current time as a single integer
+static uint32_t get_current_time_packed(void) {
+    // Calculate runtime milliseconds since last update
     runtime_ms = k_uptime_get() - previous_runtime_ms;
     uint32_t total_ms = rtc_time.ms + runtime_ms;
+
+    // Calculate the components of the current time
     uint16_t current_hour = rtc_time.hour;
     uint16_t current_minute = rtc_time.minute;
     uint16_t current_second = rtc_time.second + total_ms / 1000;
@@ -77,12 +73,13 @@ static char* get_current_time_string(void) {
         current_hour %= 24;
     }
 
-    // Allocate memory for the time string and format it
-    static char time_string[16]; // Enough space for "HH:MM:SS.mmm\0"
-    snprintf(time_string, 16, "%02u:%02u.%03u", current_minute, current_second, current_ms);
-    
-    return time_string;
+    // Pack the time into a single 32-bit integer
+    uint32_t packed_time = (current_hour << 27) | (current_minute << 21) |
+                           (current_second << 15) | (current_ms);
+
+    return packed_time;
 }
+
 
 // Start Bluetooth scanning
 int ble_start_scanning(void) {
@@ -109,7 +106,7 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
     bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
 
     // Get the current time as a string
-    char *time_str = get_current_time_string();
+    uint32_t current_time = get_current_time_packed();
 
     // Parse the advertisement data
 	uint16_t *data = ad->data;
@@ -130,28 +127,40 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
 			if (manufacturer_data && manufacturer_data_len >= sizeof(adv_mfg_data_type)) {
             adv_mfg_data_type *data = (adv_mfg_data_type *)manufacturer_data;
 
-            uint16_t company_code = (data->company_code[1] << 8) | data->company_code[0];
+            // uint16_t company_code = (data->company_code[1] << 8) | data->company_code[0];
             uint16_t number_press = data->number_press[0];
-            // char timestamp[11];
-            // memcpy(timestamp, data->timestamp, sizeof(data->timestamp));
-            // timestamp[sizeof(data->timestamp)] = '\0';
             uint16_t tx_delay = data->tx_delay[0];
             // uint32_t latitude = data->latitude;
             uint32_t longitude = data->longitude[0];
+            uint32_t tx_timestamp = data->timestamp[0];
 
              // Raw byte values for latitude
             uint32_t raw_latitude[4];
             memcpy(raw_latitude, &data->latitude[0], sizeof(raw_latitude));
+
             // Print raw byte values of latitude
             // LOG_INF("Raw Latitude Bytes: 0x%02X 0x%02X 0x%02X 0x%02X", raw_latitude[0], raw_latitude[1], raw_latitude[2], raw_latitude[3]);
+
             // Convert raw bytes to uint32_t
             uint32_t latitude = data->latitude[0];
 
             // LOG_INF("%s %s %u %s %u", 
             // time_str, addr_str, number_press, timestamp, tx_delay);
 
-            LOG_INF("%s %s %u %u %u %u", 
-            time_str, addr_str, number_press, tx_delay, latitude, longitude);
+            uint8_t current_hour = (current_time >> 27) & 0x1F;
+            uint8_t current_minute = (current_time >> 21) & 0x3F;
+            uint8_t current_second = (current_time >> 15) & 0x3F;
+            uint16_t current_ms = current_time & 0x3FF;
+
+            uint8_t timestamp_hour = (tx_timestamp >> 27) & 0x1F;
+            uint8_t timestamp_minute = (tx_timestamp >> 21) & 0x3F;
+            uint8_t timestamp_second = (tx_timestamp >> 15) & 0x3F;
+            uint16_t timestamp_ms = tx_timestamp & 0x3FF;
+
+            LOG_INF("%02u:%02u:%02u.%03u %02u:%02u:%02u.%03u %s %u %u %u %u", 
+                    current_hour, current_minute, current_second, current_ms,
+                    timestamp_hour, timestamp_minute, timestamp_second, timestamp_ms, 
+                    addr_str, number_press, tx_delay, latitude, longitude);
 
             } else {
                 // LOG_INF("Invalid manufacturer-specific data length\n");

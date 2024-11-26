@@ -30,7 +30,7 @@ typedef enum {
     STATE_DONE
 } app_state_t;
 
-static app_state_t current_state = STATE_GNSS_SEARCH;  // Initialize to GNSS search state
+static app_state_t current_state = STATE_SCANNING;  // Initialize to GNSS search state
 
 // Callback function for first GNSS fix
 void on_first_fix_acquired(void) {
@@ -74,17 +74,17 @@ int main(void) {
 		return 0;
 	}
 
-    err = nrf_modem_lib_init();
-    if (err) {
-        LOG_ERR("Failed to initialize modem, error: %d", err);
-        return -1;
-    }
+    // err = nrf_modem_lib_init();
+    // if (err) {
+    //     LOG_ERR("Failed to initialize modem, error: %d", err);
+    //     return -1;
+    // }
 
-    // Setup GNSS with the first-fix callback
-    if (setup_gnss(on_first_fix_acquired) != 0) {
-        LOG_ERR("GNSS setup failed");
-        return -1;
-    }
+    // // Setup GNSS with the first-fix callback
+    // if (setup_gnss(on_first_fix_acquired) != 0) {
+    //     LOG_ERR("GNSS setup failed");
+    //     return -1;
+    // }
 
     // k_timer_init(&timeout_timer, gnss_timeout_handler, NULL);
     // k_timer_start(&timeout_timer, K_SECONDS(60), K_FOREVER);
@@ -96,11 +96,11 @@ int main(void) {
     }
     LOG_INF("Bluetooth initialized");
 
-    // err = application_init();
-    // if (err) {
-    //     LOG_ERR("Application init failed");
-    //     return err;
-    // }
+    err = application_init();
+    if (err) {
+        LOG_ERR("Application init failed");
+        return err;
+    }
 
     // Initialize and start Bluetooth advertising
     err = advertising_module_init();

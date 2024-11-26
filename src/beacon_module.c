@@ -16,8 +16,9 @@ LOG_MODULE_REGISTER(beacon_module, LOG_LEVEL_INF);
 //     .tx_delay = {0, 0}
 // };
 static adv_mfg_data_type adv_mfg_data = {
-    .company_code = {COMPANY_ID_CODE & 0xFF, COMPANY_ID_CODE >> 8},
+    // .company_code = {COMPANY_ID_CODE & 0xFF, COMPANY_ID_CODE >> 8},
     .number_press = {0, 0},
+    .timestamp = {0,0},
     .tx_delay = {0, 0},
     .latitude = {0,0},
     .longitude = {0,0}
@@ -26,7 +27,7 @@ static adv_mfg_data_type adv_mfg_data = {
 struct packet_content {
     uint8_t tx_delay;
     uint16_t press_count;
-    char timestamp[10]; // Fixed size to hold "MM:SS.mmm\0"
+    uint32_t timestamp;
 };
 
 extern uint32_t runtime_ms;
@@ -72,10 +73,14 @@ uint32_t random_delay(uint32_t min_ms, uint32_t max_ms) {
 		return delay;
 }
 
-// Function to get current time as a formatted string without hour
-static char* get_current_time_string(void) {
-    runtime_ms = k_uptime_get_32() - previous_runtime_ms;
+// Function to get current time as a single integer
+static uint32_t get_current_time_packed(void) {
+    // Calculate runtime milliseconds since last update
+    runtime_ms = k_uptime_get() - previous_runtime_ms;
     uint32_t total_ms = rtc_time.ms + runtime_ms;
+
+    // Calculate the components of the current time
+    uint16_t current_hour = rtc_time.hour;
     uint16_t current_minute = rtc_time.minute;
     uint16_t current_second = rtc_time.second + total_ms / 1000;
     uint16_t current_ms = total_ms % 1000;
@@ -86,14 +91,18 @@ static char* get_current_time_string(void) {
         current_second %= 60;
     }
     if (current_minute >= 60) {
+        current_hour += current_minute / 60;
         current_minute %= 60;
     }
+    if (current_hour >= 24) {
+        current_hour %= 24;
+    }
 
-    // Allocate memory for the time string and format it
-    static char time_string[10]; // Enough space for "MM:SS.mmm\0"
-    snprintf(time_string, 10, "%02u:%02u.%03u", current_minute, current_second, current_ms);
-    // LOG_INF("total_ms: %u / rtc_time.ms: %u /runtime_ms:  %u /current_minute: %u",total_ms,rtc_time.ms,runtime_ms, current_minute);
-    return time_string;
+    // Pack the time into a single 32-bit integer
+    uint32_t packed_time = (current_hour << 27) | (current_minute << 21) |
+                           (current_second << 15) | (current_ms);
+
+    return packed_time;
 }
 
 // Function to generate and enqueue new packet data
@@ -166,6 +175,7 @@ int advertising_start(void) {
     adv_mfg_data.tx_delay[0] = k_uptime_get_32() - current_packet.tx_delay;
     adv_mfg_data.latitude[0] = last_gnss_data.latitude;
     adv_mfg_data.longitude[0] = last_gnss_data.longitude;
+    adv_mfg_data.timestamp[0] = get_current_time_packed();
 
     // Debug log to show packet content and its size
     // LOG_INF("Advertising packet content:");
@@ -173,14 +183,8 @@ int advertising_start(void) {
     // LOG_INF("  TX delay: %d (Size: %zu bytes)", adv_mfg_data.tx_delay[0], sizeof(adv_mfg_data.tx_delay));
     // LOG_INF("  Latitude: %d (Size: %zu bytes)", adv_mfg_data.latitude[0], sizeof(adv_mfg_data.latitude));
     // LOG_INF("  Longitude: %d (Size: %zu bytes)", adv_mfg_data.longitude[0], sizeof(adv_mfg_data.longitude));
+    // LOG_INF("  Timestamp: %d (Size: %zu bytes)", adv_mfg_data.timestamp[0], sizeof(adv_mfg_data.timestamp));
     // LOG_INF("Total packet size: %zu bytes", sizeof(adv_mfg_data));
-
-    // char *time_string = get_current_time_string();
-    // if (time_string) {
-    //     snprintf(adv_mfg_data.timestamp, sizeof(adv_mfg_data.timestamp), "%s", time_string);
-    // } else {
-    //     LOG_ERR("Failed to allocate memory for timestamp string.");
-    // }
 
     struct bt_le_ext_adv_start_param start_param = {
         .timeout = 0,
