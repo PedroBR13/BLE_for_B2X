@@ -6,6 +6,7 @@
 #include "gnss_module.h" // Include the GNSS module
 #include "scan_module.h"   // Include the BLE module
 #include "beacon_module.h"  // Include the BLE beacon module
+// #include "ble_settings.h"
 
 LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
 

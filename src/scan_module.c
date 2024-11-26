@@ -2,24 +2,12 @@
 #include <zephyr/kernel.h>
 #include "scan_module.h"
 #include "gnss_module.h"
+#include "ble_settings.h"
 
 LOG_MODULE_REGISTER(scan_module, LOG_LEVEL_INF);  // Separate logging module for Bluetooth
 
-#define SCAN_INTERVAL 80
-#define SCAN_WINDOW 80 // 50ms
-
 extern uint32_t runtime_ms;
 extern uint32_t previous_runtime_ms;
-
-typedef struct adv_mfg_data {
-    // uint16_t company_code[2];    // 2 bytes (2 * uint16_t)
-    uint16_t number_press[1];    // 2 bytes (2 * uint16_t)
-    uint32_t timestamp[1];          // 4 bytes 
-    uint8_t tx_delay[1];         // 2 bytes (2 * uint8_t)
-    uint32_t latitude[1];            // 4 bytes (scaled integer for latitude)
-    uint32_t longitude[1];           // 4 bytes (scaled integer for longitude)
-} adv_mfg_data_type;
-
 
 static void parse_advertisement_data(const uint8_t *data, int len, char **name, const uint8_t **manufacturer_data, int *manufacturer_data_len) {
     while (len > 0) {

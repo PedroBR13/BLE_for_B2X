@@ -1,20 +1,11 @@
 #include <stdlib.h>
 #include <zephyr/random/random.h>
+#include "ble_settings.h"
 #include "beacon_module.h"
 #include "gnss_module.h"
 
-#define PACKET_COPIES 3
-#define PACKET_GEN_INTERVAL K_MSEC(200)  // Frequency X in seconds
-#define ADV_INTERVAL 32 // 20ms
-
 LOG_MODULE_REGISTER(beacon_module, LOG_LEVEL_INF);
 
-// static adv_mfg_data_type adv_mfg_data = {
-//     .company_code = {COMPANY_ID_CODE & 0xFF, COMPANY_ID_CODE >> 8},
-//     .number_press = {0, 0},
-//     .timestamp = "hello scan",
-//     .tx_delay = {0, 0}
-// };
 static adv_mfg_data_type adv_mfg_data = {
     // .company_code = {COMPANY_ID_CODE & 0xFF, COMPANY_ID_CODE >> 8},
     .number_press = {0, 0},
