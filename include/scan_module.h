@@ -4,9 +4,6 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/hci.h>
 
-// Function to initialize Bluetooth
-int ble_init(void);
-
 // Function to start Bluetooth scanning
 int ble_start_scanning(void);
 

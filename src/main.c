@@ -3,6 +3,7 @@
 #include <modem/nrf_modem_lib.h>
 // #include <dk_buttons_and_leds.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/reboot.h>
 #include "gnss_module.h" // Include the GNSS module
 #include "scan_module.h"   // Include the BLE module
 #include "beacon_module.h"  // Include the BLE beacon module
@@ -13,7 +14,7 @@ LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
 /* The devicetree node identifier for the "led0" alias. */
 #define LED0_NODE DT_ALIAS(led0)
 
-#define SCAN_WINDOW 50
+#define SCAN_WINDOW 51
 
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
@@ -138,6 +139,8 @@ int main(void) {
                 err = bt_le_scan_stop();
                 if (err) {
                     LOG_ERR("Stopping scanning failed (err %d)\n", err);
+                    LOG_ERR("Critical error occurred, resetting system===========================================================================================================================");
+                    sys_reboot(SYS_REBOOT_COLD);
                     return err;
                 }
 

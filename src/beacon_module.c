@@ -6,14 +6,7 @@
 
 LOG_MODULE_REGISTER(beacon_module, LOG_LEVEL_INF);
 
-static adv_mfg_data_type adv_mfg_data = {
-    // .company_code = {COMPANY_ID_CODE & 0xFF, COMPANY_ID_CODE >> 8},
-    .number_press = {0, 0},
-    .timestamp = {0,0},
-    .tx_delay = {0, 0},
-    .latitude = {0,0},
-    .longitude = {0,0}
-};
+static adv_mfg_data_type adv_mfg_data;
 
 struct packet_content {
     uint8_t tx_delay;

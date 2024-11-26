@@ -7,7 +7,7 @@
 #define ADV_INTERVAL 32 // 20ms
 
 // SCAN PARAMERTERS
-#define SCAN_INTERVAL 81
+#define SCAN_INTERVAL 80
 #define SCAN_WINDOW 80 // 50ms
 
 
