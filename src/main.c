@@ -8,6 +8,7 @@
 #include "scan_module.h"   // Include the BLE module
 #include "beacon_module.h"  // Include the BLE beacon module
 // #include "ble_settings.h"
+#include "sdcard_module.h"
 
 LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
 
@@ -75,6 +76,14 @@ int main(void) {
 	if (ret < 0) {
 		return 0;
 	}
+
+    err = sdcard_init();
+    if (err) {
+        LOG_ERR("Failed to initialize SD Card, error: %d", err);
+        return -1;
+    }
+
+    packet_entry();
 
     // err = nrf_modem_lib_init();
     // if (err) {

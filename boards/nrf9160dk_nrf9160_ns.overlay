@@ -26,6 +26,26 @@
 	};
 };
 
+arduino_spi: &spi3 {
+	status = "okay";
+	compatible = "nordic,nrf-spim";
+	pinctrl-0 = <&spi3_default>;
+	pinctrl-1 = <&spi3_sleep>;
+	pinctrl-names = "default", "sleep";
+	cs-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
+
+	sdhc0: sdhc@0 {
+					compatible = "zephyr,sdhc-spi-slot";
+					reg = <0>;
+					status = "okay";
+					mmc {
+							compatible = "zephyr,sdmmc-disk";
+							status = "okay";
+					};
+					spi-max-frequency = <24000000>;
+	};
+};
+
 &pinctrl {
 	uart2_default_alt: uart2_default_alt {
 		group1 {
