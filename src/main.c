@@ -83,12 +83,6 @@ int main(void) {
         return err;
     }
 
-    // err = disk_mount();
-    // if (err) {
-    //     LOG_ERR("Failed mounting SD Card, error: %d", err);
-    //     return err;
-    // }
-
     create_csv();
 
     // disk_unmount();

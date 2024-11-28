@@ -138,12 +138,6 @@ int advertising_module_init(void) {
         return 0;
     }
 
-    // err = bt_le_ext_adv_set_data(adv_set, ad, ARRAY_SIZE(ad), NULL, 0);
-    // if (err) {
-    //     LOG_ERR("Failed to set extended advertising data (err %d)\n", err);
-    //     return 0;
-    // }
-
     return 0;
 }
 
@@ -170,16 +164,23 @@ int advertising_start(void) {
     // LOG_INF("  Timestamp: %d (Size: %zu bytes)", adv_mfg_data.timestamp[0], sizeof(adv_mfg_data.timestamp));
     // LOG_INF("Total packet size: %zu bytes", sizeof(adv_mfg_data));
 
-    struct bt_le_ext_adv_start_param start_param = {
-        .timeout = 0,
-        .num_events = PACKET_COPIES
-    };
-
     int err = bt_le_ext_adv_set_data(adv_set, ad, ARRAY_SIZE(ad), NULL, 0);
     if (err) {
         LOG_ERR("Failed to set advertising data (err %d)\n", err);
         return err;
     }
+    
+    struct bt_le_ext_adv_start_param start_param = {
+        .timeout = 0,
+        .num_events = PACKET_COPIES
+    };
+
+    struct bt_le_adv_param adv_param = {
+        .options = BT_LE_ADV_OPT_NONE,
+        .interval_min = ADV_INTERVAL,
+        .interval_max = ADV_INTERVAL,
+        .peer = NULL,
+    };
 
     err = bt_le_ext_adv_start(adv_set, &start_param);
     if (err) {
@@ -196,19 +197,26 @@ int advertising_start(void) {
 
 int advertising_stop(void) {
     // Stop the advertising
-    if (update_availability_flag) {
-        int err = bt_le_ext_adv_stop(adv_set);
-        if (err) {
-            LOG_ERR("Failed to stop advertising (err %d)\n", err);
-            return err;
-        }
+    // if (update_availability_flag) {
+    //     int err = bt_le_ext_adv_stop(adv_set);
+    //     if (err) {
+    //         LOG_ERR("Failed to stop advertising (err %d)\n", err);
+    //         return err;
+    //     }
 
-        // LOG_INF("Advertising stopped successfully.");
-        update_availability_flag = false;
-    }
-    
-    advertising_complete_flag = true; // Set the flag to indicate advertising has stopped
-    packet_pending = false;
+    //     // LOG_INF("Advertising stopped successfully.");
+    //     update_availability_flag = false;
+    // }
+    // int err = bt_le_ext_adv_stop(adv_set);
+    // if (err) {
+    //     LOG_ERR("Failed to stop advertising (err %d)\n", err);
+    //     return err;
+    // }
+
+    // LOG_INF("Advertising stopped successfully.");
+    advertising_complete_flag = true;
+    update_availability_flag = false; // Reset availability after advertising
+    packet_pending = false; // Mark packet as processed
 
     return 0;
 }
