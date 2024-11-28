@@ -3,11 +3,29 @@
 #include "scan_module.h"
 #include "gnss_module.h"
 #include "ble_settings.h"
+#include "sdcard_module.h"
 
 LOG_MODULE_REGISTER(scan_module, LOG_LEVEL_INF);  // Separate logging module for Bluetooth
 
 extern uint32_t runtime_ms;
 extern uint32_t previous_runtime_ms;
+struct packet_data {
+    uint16_t number_press;
+    uint16_t tx_delay;
+    uint32_t latitude;
+    uint32_t longitude;
+    uint8_t tx_hour;
+    uint8_t tx_minute;
+    uint8_t tx_second;
+    uint16_t tx_ms;
+    uint8_t rx_hour;
+    uint8_t rx_minute;
+    uint8_t rx_second;
+    uint16_t rx_ms;
+    int8_t rssi;
+};
+
+K_MSGQ_DEFINE(packet_msgq, sizeof(struct packet_data), 10, 4);
 
 static void parse_advertisement_data(const uint8_t *data, int len, char **name, const uint8_t **manufacturer_data, int *manufacturer_data_len) {
     while (len > 0) {
@@ -92,6 +110,7 @@ int ble_start_scanning(void) {
 void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf_simple *ad) {
     char addr_str[BT_ADDR_LE_STR_LEN];
     bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
+    struct packet_data pkt;
 
     // Get the current time as a string
     uint32_t current_time = get_current_time_packed();
@@ -145,10 +164,28 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
             uint8_t timestamp_second = (tx_timestamp >> 15) & 0x3F;
             uint16_t timestamp_ms = tx_timestamp & 0x3FF;
 
-            LOG_INF("%02u:%02u:%02u.%03u %02u:%02u:%02u.%03u %s %u %u %u %u", 
-                    current_hour, current_minute, current_second, current_ms,
-                    timestamp_hour, timestamp_minute, timestamp_second, timestamp_ms, 
-                    addr_str, number_press, tx_delay, latitude, longitude);
+            // LOG_INF("%02u:%02u:%02u.%03u %02u:%02u:%02u.%03u %s %u %u %u %u", 
+            //         current_hour, current_minute, current_second, current_ms,
+            //         timestamp_hour, timestamp_minute, timestamp_second, timestamp_ms, 
+            //         addr_str, number_press, tx_delay, latitude, longitude);
+
+            pkt.number_press = number_press;
+            pkt.tx_delay = tx_delay;
+            pkt.latitude = latitude;
+            pkt.longitude = longitude;
+            pkt.tx_hour = timestamp_hour;
+            pkt.tx_minute = timestamp_minute;
+            pkt.tx_second = timestamp_second;
+            pkt.tx_ms = timestamp_ms;
+            pkt.rx_hour = current_hour;
+            pkt.rx_minute = current_minute;
+            pkt.rx_second = current_second;
+            pkt.rx_ms = current_ms;
+            pkt.rssi = rssi;
+
+            if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
+                LOG_ERR("Message queue full. Dropping packet.");
+            }
 
             } else {
                 // LOG_INF("Invalid manufacturer-specific data length\n");
@@ -162,3 +199,17 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
         name = NULL;
 	}
 }
+
+void sdcard_thread(void) {
+    struct packet_data pkt;
+    while (true) {
+        if (k_msgq_get(&packet_msgq, &pkt, K_FOREVER) == 0) {
+            // Perform SD card write operation
+            append_csv(pkt.number_press, pkt.tx_delay, pkt.latitude, pkt.longitude,
+                        pkt.tx_hour, pkt.tx_minute, pkt.tx_second, pkt.tx_ms, pkt.rssi,
+                        pkt.rx_hour, pkt.rx_minute, pkt.rx_second, pkt.rx_ms);
+        }
+    }
+}
+
+K_THREAD_DEFINE(sdcard_tid, 2048, sdcard_thread, NULL, NULL, NULL, 5, 0, 0);

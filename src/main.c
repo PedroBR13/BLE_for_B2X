@@ -80,10 +80,22 @@ int main(void) {
     err = sdcard_init();
     if (err) {
         LOG_ERR("Failed to initialize SD Card, error: %d", err);
-        return -1;
+        return err;
     }
 
-    packet_entry();
+    // err = disk_mount();
+    // if (err) {
+    //     LOG_ERR("Failed mounting SD Card, error: %d", err);
+    //     return err;
+    // }
+
+    create_csv();
+
+    // disk_unmount();
+
+    // packet_entry(0, 12, 12341, 43113, 9, 23, 22, 111, -60);
+
+    // disk_unmount();
 
     // err = nrf_modem_lib_init();
     // if (err) {
@@ -129,6 +141,12 @@ int main(void) {
             case STATE_SCANNING:
                 // Initialize and start Bluetooth scanning
                 // LOG_INF("Scan start");
+                // err = disk_mount();
+                // if (err) {
+                //     LOG_ERR("Failed mounting SD Card, error: %d", err);
+                //     return err;
+                // }
+
                 err = ble_start_scanning();
                 if (err) {
                     LOG_ERR("BLE scanning start failed");
@@ -149,9 +167,12 @@ int main(void) {
                 if (err) {
                     LOG_ERR("Stopping scanning failed (err %d)\n", err);
                     LOG_ERR("Critical error occurred, resetting system===========================================================================================================================");
+                    disk_unmount();
                     sys_reboot(SYS_REBOOT_COLD);
                     return err;
                 }
+
+                // disk_unmount();
 
                 // Move to ADVERTISING state
                 current_state = STATE_ADVERTISING;

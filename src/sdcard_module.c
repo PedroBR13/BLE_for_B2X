@@ -43,40 +43,8 @@ LOG_MODULE_REGISTER(sdcard_module);
 
 static const char *disk_mount_pt = DISK_MOUNT_PT;
 
-/* Determine the highest ID in the existing file */
-static int get_highest_id(const char *file_path)
-{
-	struct fs_file_t file;
-	char buffer[128];
-	int highest_id = 0;
-
-	fs_file_t_init(&file);
-
-	if (fs_open(&file, file_path, FS_O_READ) < 0) {
-		LOG_ERR("Failed to open file %s to read IDs", file_path);
-		return -1;
-	}
-
-	while (fs_read(&file, buffer, sizeof(buffer) - 1) > 0) {
-		buffer[sizeof(buffer) - 1] = '\0';  // Ensure null termination
-
-		/* Parse lines to extract IDs */
-		char *line = strtok(buffer, "\n");
-		while (line) {
-			int id;
-			if (sscanf(line, "%d,", &id) == 1 && id > highest_id) {
-				highest_id = id;
-			}
-			line = strtok(NULL, "\n");
-		}
-	}
-
-	fs_close(&file);
-	return highest_id;
-}
-
-/* Create and/or append to a CSV file */
-static bool create_and_append_csv(const char *base_path)
+/* Create a CSV file */
+int create_csv(void)
 {
     char csv_path[128];
     struct fs_file_t file;
@@ -85,7 +53,7 @@ static bool create_and_append_csv(const char *base_path)
     fs_file_t_init(&file);
 
     /* Construct the full file path */
-    snprintf(csv_path, sizeof(csv_path), "%s/%s", base_path, CSV_FILE_NAME);
+    snprintf(csv_path, sizeof(csv_path), "%s/%s", disk_mount_pt, CSV_FILE_NAME);
 
     /* Check if file exists */
     res = fs_open(&file, csv_path, FS_O_READ);
@@ -93,56 +61,61 @@ static bool create_and_append_csv(const char *base_path)
         /* File doesn't exist, create it and write headers */
         LOG_INF("File %s does not exist. Creating new file.", csv_path);
 
+        /* Open file in write-create mode */
         res = fs_open(&file, csv_path, FS_O_WRITE | FS_O_CREATE);
         if (res < 0) {
             LOG_ERR("Failed to create file %s (err: %d)", csv_path, res);
-            return false;
+            return -1;
         }
 
-        /* Write CSV headers */
-        const char *headers = "ID,Timestamp,Value1,Value2\n";
-        res = fs_write(&file, headers, strlen(headers));
-        if (res < 0) {
-            LOG_ERR("Failed to write headers to %s (err: %d)", csv_path, res);
-            fs_close(&file);
-            return false;
-        }
-        fs_close(&file);
     }
-
-    /* Determine the highest ID in the file */
-    int highest_id = get_highest_id(csv_path);
-    if (highest_id < 0) {
-        return false;
-    }
-    LOG_INF("Highest ID in the file: %d", highest_id);
-
-    fs_file_t_init(&file);
-
-    /* Open file for appending */
-    res = fs_open(&file, csv_path, FS_O_WRITE);
-    if (res < 0) {
-        LOG_ERR("Failed to open file %s for appending (err: %d)", csv_path, res);
-        return false;
-    }
-
-    /* Append a new row */
-    char buffer[64];
-    int value1 = 42;
-    int value2 = 84;
-    int written = snprintf(buffer, sizeof(buffer), "%d,%lu,%d,%d\n",
-        highest_id + 1, k_uptime_get(), value1, value2);
-    res = fs_write(&file, buffer, written);
-    if (res < 0) {
-        LOG_ERR("Failed to append data to %s (err: %d)", csv_path, res);
-        fs_close(&file);
-        return false;
-    }
-
-    LOG_INF("Data appended to CSV file: %s", buffer);
-
+    /* Close the file */
     fs_close(&file);
-    return true;
+    return 0;
+}
+
+/* Append to a CSV file */
+int append_csv(uint16_t number_press, uint16_t tx_delay, uint32_t latitude, uint32_t longitude, 
+              uint8_t tx_hour, uint8_t tx_minute, uint8_t tx_second, uint16_t tx_ms,int8_t rssi,
+              uint8_t rx_hour, uint8_t rx_minute, uint8_t rx_second, uint16_t rx_ms) {
+  char csv_path[128];
+  struct fs_file_t file;
+  int res;
+  mp.mnt_point = disk_mount_pt;
+
+  fs_file_t_init(&file);
+
+  /* Construct the full file path */
+  snprintf(csv_path, sizeof(csv_path), "%s/%s", mp.mnt_point, CSV_FILE_NAME);
+
+  /* Open file for appending */
+  res = fs_open(&file, csv_path,  FS_O_WRITE | FS_O_APPEND );
+  if (res < 0) {
+      LOG_ERR("Failed to open file %s for appending (err: %d)", csv_path, res);
+      return false;
+  }
+
+  /* Append a new row */
+  char buffer[64];
+
+  // timestamp_id, timestamp_tx, tx_delay,timestamp_rx, number_press, latitude, longitude, rssi
+  int written = snprintf(buffer, sizeof(buffer), "%02u%02u%02u%03u,%02u:%02u:%02u.%03u,%u,%02u:%02u:%02u.%03u,%u,%u,%u,%d\n",
+                        tx_hour, tx_minute, tx_second, tx_ms, tx_hour, tx_minute, tx_second, tx_ms,tx_delay,
+                        rx_hour, rx_minute, rx_second, rx_ms,number_press,latitude,longitude, rssi);
+
+  res = fs_write(&file, buffer, written);
+  if (res < 0) {
+      LOG_ERR("Failed to append data to %s (err: %d)", csv_path, res);
+      fs_close(&file);
+      return false;
+  } else {
+      LOG_INF("Data appended to CSV file: %s", buffer);
+  }
+
+ 
+
+  fs_close(&file);
+  return 0;
 }
 
 int sdcard_init(void)
@@ -178,13 +151,10 @@ int sdcard_init(void)
 
     LOG_INF("SD card ready");
 	} while (0);
-	return 0;
-}
 
-int packet_entry(void) {
-  	mp.mnt_point = disk_mount_pt;
+  mp.mnt_point = disk_mount_pt;
 
-  	int res = fs_mount(&mp);
+  int res = fs_mount(&mp);
 
   #if defined(CONFIG_FAT_FILESYSTEM_ELM)
   	if (res == FR_OK) {
@@ -192,18 +162,14 @@ int packet_entry(void) {
   	if (res == 0) {
   #endif
   		LOG_INF("Disk mounted.\n");
-
-  		/* Create and append to the CSV file */
-  		if (create_and_append_csv(disk_mount_pt)) {
-  			LOG_INF("CSV operations completed successfully.\n");
-  		} else {
-  			LOG_ERR("CSV operations failed.\n");
-  		}
-  	} else {
+    } else {
   		LOG_ERR("Error mounting disk.\n");
   	}
 
-  	fs_unmount(&mp);
+	return 0;
+}
 
+int disk_unmount(void){
+  fs_unmount(&mp);
   return 0;
 }
