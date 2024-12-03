@@ -92,11 +92,11 @@ int append_csv(uint16_t number_press, uint16_t tx_delay, uint32_t latitude, uint
   res = fs_open(&file, csv_path,  FS_O_WRITE | FS_O_APPEND );
   if (res < 0) {
       LOG_ERR("Failed to open file %s for appending (err: %d)", csv_path, res);
-      return false;
+      return 0;
   }
 
   /* Append a new row */
-  char buffer[64];
+  char buffer[124];
 
   // timestamp_id, timestamp_tx, tx_delay,timestamp_rx, number_press, latitude, longitude, rssi
   int written = snprintf(buffer, sizeof(buffer), "%02u%02u%02u%03u,%02u:%02u:%02u.%03u,%u,%02u:%02u:%02u.%03u,%u,%u,%u,%d\n",
@@ -108,9 +108,10 @@ int append_csv(uint16_t number_press, uint16_t tx_delay, uint32_t latitude, uint
       LOG_ERR("Failed to append data to %s (err: %d)", csv_path, res);
       fs_close(&file);
       return false;
-  } else {
-      LOG_INF("Data appended to CSV file: %s", buffer);
-  }
+  } 
+  // else {
+  //     LOG_INF("Data appended to CSV file: %s", buffer);
+  // }
 
  
 
@@ -121,52 +122,56 @@ int append_csv(uint16_t number_press, uint16_t tx_delay, uint32_t latitude, uint
 int sdcard_init(void)
 {
 	/* Initialize storage and mount the disk */
-	do {
-		static const char *disk_pdrv = DISK_DRIVE_NAME;
-		uint64_t memory_size_mb;
-		uint32_t block_count;
-		uint32_t block_size;
+	// do {
+	// 	static const char *disk_pdrv = DISK_DRIVE_NAME;
+	// 	uint64_t memory_size_mb;
+	// 	uint32_t block_count;
+	// 	uint32_t block_size;
 
-		if (disk_access_init(disk_pdrv) != 0) {
-			LOG_ERR("Storage init ERROR!");
-			break;
-		}
+	// 	if (disk_access_init(disk_pdrv) != 0) {
+	// 		LOG_ERR("Storage init ERROR!");
+	// 		break;
+	// 	}
 
-		if (disk_access_ioctl(disk_pdrv,
-				DISK_IOCTL_GET_SECTOR_COUNT, &block_count)) {
-			LOG_ERR("Unable to get sector count");
-			break;
-		}
-		// LOG_INF("Block count %u", block_count);
+	// 	if (disk_access_ioctl(disk_pdrv,
+	// 			DISK_IOCTL_GET_SECTOR_COUNT, &block_count)) {
+	// 		LOG_ERR("Unable to get sector count");
+	// 		break;
+	// 	}
+	// 	// LOG_INF("Block count %u", block_count);
 
-		if (disk_access_ioctl(disk_pdrv,
-				DISK_IOCTL_GET_SECTOR_SIZE, &block_size)) {
-			LOG_ERR("Unable to get sector size");
-			break;
-		}
-		// LOG_INF("Sector size %u\n", block_size);
+	// 	if (disk_access_ioctl(disk_pdrv,
+	// 			DISK_IOCTL_GET_SECTOR_SIZE, &block_size)) {
+	// 		LOG_ERR("Unable to get sector size");
+	// 		break;
+	// 	}
+	// 	// LOG_INF("Sector size %u\n", block_size);
 
-		memory_size_mb = (uint64_t)block_count * block_size;
-		LOG_INF("Memory Size(MB) %u", (uint32_t)(memory_size_mb >> 20));
+	// 	memory_size_mb = (uint64_t)block_count * block_size;
+	// 	LOG_INF("Memory Size(MB) %u", (uint32_t)(memory_size_mb >> 20));
 
-    LOG_INF("SD card ready");
-	} while (0);
+  //   LOG_INF("SD card ready");
+	// } while (0);
 
   mp.mnt_point = disk_mount_pt;
 
-  int res = fs_mount(&mp);
+    while (1) {  // Repeat indefinitely until successful
+        int res = fs_mount(&mp);
 
-  #if defined(CONFIG_FAT_FILESYSTEM_ELM)
-  	if (res == FR_OK) {
-  #else
-  	if (res == 0) {
-  #endif
-  		LOG_INF("Disk mounted.\n");
-    } else {
-  		LOG_ERR("Error mounting disk.\n");
-  	}
+#if defined(CONFIG_FAT_FILESYSTEM_ELM)
+        if (res == FR_OK) {
+#else
+        if (res == 0) {
+#endif
+            LOG_INF("Disk mounted successfully.");
+            return 0;  // Exit the function when successful
+        } else {
+            LOG_ERR("Error mounting disk. Error code: %d", res);
+            LOG_INF("Retrying to mount the disk...");
+        }
 
-	return 0;
+        k_sleep(K_SECONDS(1));  // Delay before retrying
+    }
 }
 
 int disk_unmount(void){

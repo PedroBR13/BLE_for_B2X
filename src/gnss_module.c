@@ -2,7 +2,7 @@
 #include <nrf_modem_gnss.h>
 #include <modem/nrf_modem_lib.h>
 #include <modem/lte_lc.h>
-#include <dk_buttons_and_leds.h>
+// #include <dk_buttons_and_leds.h>
 #include <zephyr/logging/log.h>
 #include "gnss_module.h" // Include the header file for GNSS functionality
 
@@ -99,7 +99,7 @@ void update_rtc_from_gnss(void) {
     LOG_INF("RTC updated from GNSS: %02u:%02u:%02u.%03u - Coordinates: %u, %u", 
             rtc_time.hour, rtc_time.minute, rtc_time.second, rtc_time.ms, last_gnss_data.latitude, last_gnss_data.longitude);
 
-    dk_set_led_on(DK_LED1); // Indicate fix acquisition with LED
+    // dk_set_led_on(DK_LED1); // Indicate fix acquisition with LED
 }
 
 // GNSS setup function that accepts a callback for the first fix

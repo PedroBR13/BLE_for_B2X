@@ -14,13 +14,19 @@ LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
 
 /* The devicetree node identifier for the "led0" alias. */
 #define LED0_NODE DT_ALIAS(led0)
+#define LED1_NODE DT_ALIAS(led1)
+#define LED2_NODE DT_ALIAS(led2)
+#define LED3_NODE DT_ALIAS(led3)
 
 #define SCAN_WINDOW 51
 
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+static const struct gpio_dt_spec led2 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
+static const struct gpio_dt_spec led3 = GPIO_DT_SPEC_GET(LED2_NODE, gpios);
+static const struct gpio_dt_spec led4 = GPIO_DT_SPEC_GET(LED3_NODE, gpios);
 
 // Timers
-static struct k_timer timeout_timer;
+// static struct k_timer timeout_timer;
 
 // Define the runtime variables globally so they can be accessed from other files
 uint32_t runtime_ms = 0;
@@ -33,7 +39,7 @@ typedef enum {
     STATE_DONE
 } app_state_t;
 
-static app_state_t current_state = STATE_SCANNING;  // Initialize to GNSS search state
+static app_state_t current_state = STATE_GNSS_SEARCH;  // Initialize to GNSS search state
 
 // Callback function for first GNSS fix
 void on_first_fix_acquired(void) {
@@ -43,23 +49,23 @@ void on_first_fix_acquired(void) {
         LOG_ERR("Application init failed");
         return err;
     }
-    current_state = STATE_SCANNING;
+    current_state = STATE_DONE;
 }
 
 // GNSS timeout handler
-static void gnss_timeout_handler(struct k_timer *timer_id) {
-    LOG_INF("GNSS search timed out, using hardcoded timestamp.");
+// static void gnss_timeout_handler(struct k_timer *timer_id) {
+//     LOG_INF("GNSS search timed out, using hardcoded timestamp.");
     
-    rtc_time.hour = 0;
-    rtc_time.minute = 0;
-    rtc_time.second = 0;
-    rtc_time.ms = 0;
+//     rtc_time.hour = 0;
+//     rtc_time.minute = 0;
+//     rtc_time.second = 0;
+//     rtc_time.ms = 0;
 
-    LOG_INF("Hardcoded RTC time set to: %02u:%02u:%02u.%03u",
-            rtc_time.hour, rtc_time.minute, rtc_time.second, rtc_time.ms);
+//     LOG_INF("Hardcoded RTC time set to: %02u:%02u:%02u.%03u",
+//             rtc_time.hour, rtc_time.minute, rtc_time.second, rtc_time.ms);
 
-    current_state = STATE_DONE;
-}
+//     current_state = STATE_DONE;
+// }
 
 int main(void) {
     int err;
@@ -68,63 +74,52 @@ int main(void) {
     // dk_leds_init();
 
     int ret;
-    if (!gpio_is_ready_dt(&led)) {
+    if (!gpio_is_ready_dt(&led1)) {
+		return 0;
+	}
+    if (!gpio_is_ready_dt(&led2)) {
+		return 0;
+	}
+    if (!gpio_is_ready_dt(&led3)) {
+		return 0;
+	}
+    if (!gpio_is_ready_dt(&led4)) {
 		return 0;
 	}
 
-	ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
-	if (ret < 0) {
-		return 0;
-	}
+	// ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
+	// if (ret < 0) {
+	// 	return 0;
+	// }
 
+    gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);
+    gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);
+    
     err = sdcard_init();
     if (err) {
         LOG_ERR("Failed to initialize SD Card, error: %d", err);
-        return err;
+        return 0;
+    } else {
+        create_csv();
+    } 
+
+    err = nrf_modem_lib_init();
+    if (err) {
+        LOG_ERR("Failed to initialize modem, error: %d", err);
+        return -1;
     }
 
-    create_csv();
+    // Setup GNSS with the first-fix callback
+    if (setup_gnss(on_first_fix_acquired) != 0) {
+        LOG_ERR("GNSS setup failed");
+        return -1;
+    }
 
-    // disk_unmount();
-
-    // packet_entry(0, 12, 12341, 43113, 9, 23, 22, 111, -60);
-
-    // disk_unmount();
-
-    // err = nrf_modem_lib_init();
-    // if (err) {
-    //     LOG_ERR("Failed to initialize modem, error: %d", err);
-    //     return -1;
-    // }
-
-    // // Setup GNSS with the first-fix callback
-    // if (setup_gnss(on_first_fix_acquired) != 0) {
-    //     LOG_ERR("GNSS setup failed");
-    //     return -1;
-    // }
+    gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
+    gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
 
     // k_timer_init(&timeout_timer, gnss_timeout_handler, NULL);
     // k_timer_start(&timeout_timer, K_SECONDS(60), K_FOREVER);
-
-    err = bt_enable(NULL);
-    if (err) {
-        LOG_ERR("Bluetooth init failed (err %d)", err);
-        return err;
-    }
-    LOG_INF("Bluetooth initialized");
-
-    err = application_init();
-    if (err) {
-        LOG_ERR("Application init failed");
-        return err;
-    }
-
-    // Initialize and start Bluetooth advertising
-    err = advertising_module_init();
-    if (err) {
-        LOG_ERR("Advertising module init failed");
-        return err;
-    }
 
     // Main loop
     while (true) {
@@ -132,15 +127,15 @@ int main(void) {
             case STATE_GNSS_SEARCH:
                 // LOG_INF("Searching first fix");
                 break;
+
             case STATE_SCANNING:
                 // Initialize and start Bluetooth scanning
-                // LOG_INF("Scan start");
-                // err = disk_mount();
-                // if (err) {
-                //     LOG_ERR("Failed mounting SD Card, error: %d", err);
-                //     return err;
-                // }
+                ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
+                if (ret < 0) {
+                    return 0;
+                }
 
+                // LOG_INF("Start scan");
                 err = ble_start_scanning();
                 if (err) {
                     LOG_ERR("BLE scanning start failed");
@@ -161,10 +156,11 @@ int main(void) {
                 if (err) {
                     LOG_ERR("Stopping scanning failed (err %d)\n", err);
                     LOG_ERR("Critical error occurred, resetting system===========================================================================================================================");
-                    disk_unmount();
+                    // disk_unmount();
                     sys_reboot(SYS_REBOOT_COLD);
                     return err;
                 }
+                // LOG_INF("Scan Stop");
 
                 // disk_unmount();
 
@@ -173,6 +169,12 @@ int main(void) {
                 break;
 
             case STATE_ADVERTISING:
+                // LOG_INF("Start beacon");
+                ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);
+                if (ret < 0) {
+                    return 0;
+                }
+
                 err = advertising_start();
                 if (err) {
                     LOG_ERR("Advertising start failed");
@@ -191,11 +193,33 @@ int main(void) {
 
             case STATE_DONE:
                 // LOG_INF("Process done. Going to scanning state");
+                gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
+                gpio_pin_configure_dt(&led2, GPIO_OUTPUT_INACTIVE);
+                gpio_pin_configure_dt(&led3, GPIO_OUTPUT_INACTIVE);
+                gpio_pin_configure_dt(&led4, GPIO_OUTPUT_INACTIVE);
+
+                // Enable BLE 
+                err = bt_enable(NULL);
+                if (err) {
+                    LOG_ERR("Bluetooth init failed (err %d)", err);
+                    return err;
+                }
+                LOG_INF("Bluetooth initialized");
+
                 err = application_init();
                 if (err) {
                     LOG_ERR("Application init failed");
                     return err;
                 }
+
+                // Initialize and start Bluetooth advertising
+                err = advertising_module_init();
+                if (err) {
+                    LOG_ERR("Advertising module init failed");
+                    return err;
+                }
+
+                
                 current_state = STATE_SCANNING;
                 break;
 
