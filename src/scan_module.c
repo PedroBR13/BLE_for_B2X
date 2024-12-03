@@ -7,8 +7,6 @@
 
 LOG_MODULE_REGISTER(scan_module, LOG_LEVEL_INF);  // Separate logging module for Bluetooth
 
-extern uint32_t runtime_ms;
-extern uint32_t previous_runtime_ms;
 struct packet_data {
     uint16_t number_press;
     uint16_t tx_delay;
@@ -57,7 +55,8 @@ static void parse_advertisement_data(const uint8_t *data, int len, char **name, 
 // Function to get current time as a single integer
 static uint32_t get_current_time_packed(void) {
     // Calculate runtime milliseconds since last update
-    runtime_ms = k_uptime_get() - previous_runtime_ms;
+    uint32_t runtime_ms = k_uptime_get() - rtc_time.last_runtime;
+    // LOG_INF("uptime: %llu - last_runtime: %u = %u", k_uptime_get(), rtc_time.last_runtime, runtime_ms);
     uint32_t total_ms = rtc_time.ms + runtime_ms;
 
     // Calculate the components of the current time
@@ -150,9 +149,6 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
 
             // Convert raw bytes to uint32_t
             uint32_t latitude = data->latitude[0];
-
-            // LOG_INF("%s %s %u %s %u", 
-            // time_str, addr_str, number_press, timestamp, tx_delay);
 
             uint8_t current_hour = (current_time >> 27) & 0x1F;
             uint8_t current_minute = (current_time >> 21) & 0x3F;

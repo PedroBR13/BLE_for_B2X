@@ -15,7 +15,6 @@ static gnss_fix_callback_t fix_cb;  // Callback for first fix
 // Structure to hold current RTC time
 struct rtc_time_s rtc_time;
 struct gnss_s last_gnss_data = {52243187,6856186};
-static uint32_t previous_runtime_ms = 0;
 
 // GNSS event handler
 static void gnss_event_handler(int event) {
@@ -86,7 +85,7 @@ static void gnss_timeout_handler(struct k_timer *timer_id) {
 
 // Function to update RTC from GNSS
 void update_rtc_from_gnss(void) {
-    previous_runtime_ms = k_uptime_get();
+    rtc_time.last_runtime = k_uptime_get();
     rtc_time.hour = pvt_data.datetime.hour;
     rtc_time.minute = pvt_data.datetime.minute;
     rtc_time.second = pvt_data.datetime.seconds;
@@ -109,6 +108,10 @@ int setup_gnss(gnss_fix_callback_t fix_callback) {
     // Store the callback function
     fix_cb = fix_callback;
 
+    uint8_t use_case;
+
+    use_case = NRF_MODEM_GNSS_USE_CASE_MULTIPLE_HOT_START | NRF_MODEM_GNSS_USE_CASE_LOW_ACCURACY;
+
     err = lte_lc_func_mode_set(LTE_LC_FUNC_MODE_ACTIVATE_GNSS);
     if (err) {
         LOG_ERR("Failed to activate GNSS functional mode");
@@ -121,15 +124,21 @@ int setup_gnss(gnss_fix_callback_t fix_callback) {
         return err;
     }
 
-    err = nrf_modem_gnss_fix_interval_set(10);
+    err = nrf_modem_gnss_fix_interval_set(1);
     if (err) {
         LOG_ERR("Failed to set GNSS fix interval");
         return err;
     }
 
-    err = nrf_modem_gnss_fix_retry_set(120);
+    err = nrf_modem_gnss_fix_retry_set(0);
     if (err) {
         LOG_ERR("Failed to set GNSS fix retry");
+        return err;
+    }
+
+    err = nrf_modem_gnss_use_case_set(use_case);
+    if (err) {
+        LOG_ERR("Failed to set GNSS use case");
         return err;
     }
 

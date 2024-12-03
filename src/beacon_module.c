@@ -14,9 +14,6 @@ struct packet_content {
     uint32_t timestamp;
 };
 
-extern uint32_t runtime_ms;
-extern uint32_t previous_runtime_ms;
-
 static struct packet_content current_packet; // Single-packet buffer
 static bool packet_pending = false; // Indicates if a packet is waiting to be served
 
@@ -60,7 +57,7 @@ uint32_t random_delay(uint32_t min_ms, uint32_t max_ms) {
 // Function to get current time as a single integer
 static uint32_t get_current_time_packed(void) {
     // Calculate runtime milliseconds since last update
-    runtime_ms = k_uptime_get() - previous_runtime_ms;
+    uint32_t runtime_ms = k_uptime_get() - rtc_time.last_runtime;
     uint32_t total_ms = rtc_time.ms + runtime_ms;
 
     // Calculate the components of the current time

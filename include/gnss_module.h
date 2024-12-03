@@ -9,6 +9,7 @@ struct rtc_time_s {
     uint8_t minute;
     uint8_t second;
     uint16_t ms;
+    uint32_t last_runtime;
 };
 
 // RTC structure
