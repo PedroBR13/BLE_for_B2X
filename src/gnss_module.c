@@ -110,7 +110,7 @@ int setup_gnss(gnss_fix_callback_t fix_callback) {
 
     uint8_t use_case;
 
-    use_case = NRF_MODEM_GNSS_USE_CASE_MULTIPLE_HOT_START | NRF_MODEM_GNSS_USE_CASE_LOW_ACCURACY;
+    // use_case = NRF_MODEM_GNSS_USE_CASE_MULTIPLE_HOT_START | NRF_MODEM_GNSS_USE_CASE_LOW_ACCURACY;
 
     err = lte_lc_func_mode_set(LTE_LC_FUNC_MODE_ACTIVATE_GNSS);
     if (err) {
@@ -136,11 +136,11 @@ int setup_gnss(gnss_fix_callback_t fix_callback) {
         return err;
     }
 
-    err = nrf_modem_gnss_use_case_set(use_case);
-    if (err) {
-        LOG_ERR("Failed to set GNSS use case");
-        return err;
-    }
+    // err = nrf_modem_gnss_use_case_set(use_case);
+    // if (err) {
+    //     LOG_ERR("Failed to set GNSS use case");
+    //     return err;
+    // }
 
     return nrf_modem_gnss_start();
 }

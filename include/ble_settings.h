@@ -3,12 +3,12 @@
 
 // ADVERTISING PARAMETERS
 #define PACKET_COPIES 3
-#define PACKET_GEN_INTERVAL K_MSEC(200)  // Frequency X in seconds
+#define PACKET_GEN_INTERVAL K_MSEC(400)  // Frequency X in seconds
 #define ADV_INTERVAL 32 // 20ms
 
 // SCAN PARAMERTERS
 #define SCAN_INTERVAL 80
-#define SCAN_WINDOW 80 // 50ms
+#define SCAN_WINDOW 80 // 80 = 50ms, 128 = 80 ms
 
 
 // PACKET STRUCTURE

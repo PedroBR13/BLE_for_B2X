@@ -46,7 +46,7 @@ static const char *disk_mount_pt = DISK_MOUNT_PT;
 /* Create a CSV file */
 int create_csv(void)
 {
-    char csv_path[128];
+    char csv_path[150];
     struct fs_file_t file;
     int res;
 

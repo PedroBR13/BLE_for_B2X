@@ -1,9 +1,9 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <modem/nrf_modem_lib.h>
-// #include <dk_buttons_and_leds.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/sys/reboot.h>
+#include <zephyr/bluetooth/hci.h>
 #include "gnss_module.h" // Include the GNSS module
 #include "scan_module.h"   // Include the BLE module
 #include "beacon_module.h"  // Include the BLE beacon module
@@ -18,15 +18,12 @@ LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
 #define LED2_NODE DT_ALIAS(led2)
 #define LED3_NODE DT_ALIAS(led3)
 
-#define SCAN_WINDOW 51
+#define SCAN_WINDOW 50
 
 static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 static const struct gpio_dt_spec led2 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
 static const struct gpio_dt_spec led3 = GPIO_DT_SPEC_GET(LED2_NODE, gpios);
 static const struct gpio_dt_spec led4 = GPIO_DT_SPEC_GET(LED3_NODE, gpios);
-
-// Timers
-// static struct k_timer timeout_timer;
 
 // Define the runtime variables globally so they can be accessed from other files
 uint32_t runtime_ms = 0;
@@ -36,7 +33,8 @@ typedef enum {
     STATE_GNSS_SEARCH,
     STATE_SCANNING,
     STATE_ADVERTISING,
-    STATE_DONE
+    STATE_DONE,
+    STATE_ERROR
 } app_state_t;
 
 static app_state_t current_state = STATE_GNSS_SEARCH;  // Initialize to GNSS search state
@@ -47,25 +45,10 @@ void on_first_fix_acquired(void) {
     int err = application_init();
     if (err) {
         LOG_ERR("Application init failed");
-        return err;
+        return;
     }
     current_state = STATE_DONE;
 }
-
-// GNSS timeout handler
-// static void gnss_timeout_handler(struct k_timer *timer_id) {
-//     LOG_INF("GNSS search timed out, using hardcoded timestamp.");
-    
-//     rtc_time.hour = 0;
-//     rtc_time.minute = 0;
-//     rtc_time.second = 0;
-//     rtc_time.ms = 0;
-
-//     LOG_INF("Hardcoded RTC time set to: %02u:%02u:%02u.%03u",
-//             rtc_time.hour, rtc_time.minute, rtc_time.second, rtc_time.ms);
-
-//     current_state = STATE_DONE;
-// }
 
 int main(void) {
     int err;
@@ -87,11 +70,6 @@ int main(void) {
 		return 0;
 	}
 
-	// ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
-	// if (ret < 0) {
-	// 	return 0;
-	// }
-
     gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);
     gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);
     
@@ -102,6 +80,8 @@ int main(void) {
     } else {
         create_csv();
     } 
+
+    append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     err = nrf_modem_lib_init();
     if (err) {
@@ -118,9 +98,6 @@ int main(void) {
     gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
     gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
 
-    // k_timer_init(&timeout_timer, gnss_timeout_handler, NULL);
-    // k_timer_start(&timeout_timer, K_SECONDS(60), K_FOREVER);
-
     // Main loop
     while (true) {
         switch (current_state) {
@@ -136,11 +113,6 @@ int main(void) {
                 }
 
                 // LOG_INF("Start scan");
-                err = ble_start_scanning();
-                if (err) {
-                    LOG_ERR("BLE scanning start failed");
-                    return err;
-                }
 
                 // Simulate scanning duration
                 k_sleep(K_MSEC(SCAN_WINDOW));
@@ -150,19 +122,6 @@ int main(void) {
                     // LOG_INF("Scan interval reset due to no data to send. \n");
                     k_sleep(K_MSEC(SCAN_WINDOW));
                 }
-
-                // Stop scanning before transitioning to advertising
-                err = bt_le_scan_stop();
-                if (err) {
-                    LOG_ERR("Stopping scanning failed (err %d)\n", err);
-                    LOG_ERR("Critical error occurred, resetting system===========================================================================================================================");
-                    // disk_unmount();
-                    sys_reboot(SYS_REBOOT_COLD);
-                    return err;
-                }
-                // LOG_INF("Scan Stop");
-
-                // disk_unmount();
 
                 // Move to ADVERTISING state
                 current_state = STATE_ADVERTISING;
@@ -178,7 +137,9 @@ int main(void) {
                 err = advertising_start();
                 if (err) {
                     LOG_ERR("Advertising start failed");
-                    return err;
+                    current_state = STATE_ERROR;
+                    break;
+                    // return err;
                 }
 
                 // Wait here until advertising completes
@@ -219,9 +180,46 @@ int main(void) {
                     return err;
                 }
 
+                err = ble_start_scanning();
+                if (err) {
+                    LOG_ERR("BLE scanning start failed");
+                    return err;
+                }
+
                 
                 current_state = STATE_SCANNING;
                 break;
+
+            case STATE_ERROR:
+                // int err = bt_hci_cmd_send_sync(BT_HCI_OP_RESET, NULL, NULL);
+                // if (err) {
+                //     LOG_ERR("HCI Reset failed (err %d)\n", err);
+                // }
+                append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+                // err = nrf_modem_gnss_stop(); // Stop GNSS to save resources and retain state.
+                // if (err) {
+                //     LOG_ERR("GNSS stop failed");
+                //     return err;
+                // }
+                disk_unmount();
+                sys_reboot(SYS_REBOOT_COLD);
+
+                // err = bt_disable();
+                // if (err) {
+                //     LOG_ERR("Bluetooth stop failed (err %d)", err);
+                //     return err;
+                // }
+
+                // err = bt_enable(NULL);
+                // if (err) {
+                //     LOG_ERR("Bluetooth init failed (err %d)", err);
+                //     return err;
+                // }
+                
+                current_state = STATE_SCANNING;
+                break;
+
 
             default:
                 LOG_ERR("Unknown state");

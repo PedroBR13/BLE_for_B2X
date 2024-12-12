@@ -1,7 +1,7 @@
 #ifndef SDCARD_MODULE_H
 #define SDCARD_MODULE_H
 
-#define CSV_FILE_NAME "test3.csv"
+#define CSV_FILE_NAME "msg400n3.csv" //sw50n3, msg400n5, sw80n3, msg400
 
 int sdcard_init(void);
 int disk_unmount(void);

@@ -181,7 +181,7 @@ int advertising_start(void) {
 
     err = bt_le_ext_adv_start(adv_set, &start_param);
     if (err) {
-        LOG_ERR("Failed to start advertising (err %d)\n", err);
+        LOG_ERR("Failed to start advertising (err %d)", err);
         return err;
     }
 
