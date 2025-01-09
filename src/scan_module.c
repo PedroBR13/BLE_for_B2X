@@ -1,5 +1,6 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
+#include <stdlib.h>
 #include "scan_module.h"
 #include "gnss_module.h"
 #include "ble_settings.h"
@@ -23,7 +24,11 @@ struct packet_data {
     int8_t rssi;
 };
 
+#if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
 K_MSGQ_DEFINE(packet_msgq, sizeof(struct packet_data), 10, 4);
+#endif
+
+static struct rtc_time_s rtc_time = {0,0,0,0,0};
 
 static void parse_advertisement_data(const uint8_t *data, int len, char **name, const uint8_t **manufacturer_data, int *manufacturer_data_len) {
     while (len > 0) {
@@ -133,10 +138,8 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
 			if (manufacturer_data && manufacturer_data_len >= sizeof(adv_mfg_data_type)) {
             adv_mfg_data_type *data = (adv_mfg_data_type *)manufacturer_data;
 
-            // uint16_t company_code = (data->company_code[1] << 8) | data->company_code[0];
             uint16_t number_press = data->number_press[0];
             uint16_t tx_delay = data->tx_delay[0];
-            // uint32_t latitude = data->latitude;
             uint32_t longitude = data->longitude[0];
             uint32_t tx_timestamp = data->timestamp[0];
 
@@ -178,10 +181,12 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
             pkt.rx_second = current_second;
             pkt.rx_ms = current_ms;
             pkt.rssi = rssi;
-
-            if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
-                LOG_ERR("Message queue full. Dropping packet.");
-            }
+            
+            #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+                if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
+                    LOG_ERR("Message queue full. Dropping packet.");
+                }
+            #endif
 
             } else {
                 // LOG_INF("Invalid manufacturer-specific data length\n");
@@ -196,16 +201,18 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
 	}
 }
 
-void sdcard_thread(void) {
-    struct packet_data pkt;
-    while (true) {
-        if (k_msgq_get(&packet_msgq, &pkt, K_FOREVER) == 0) {
-            // Perform SD card write operation
-            append_csv(pkt.number_press, pkt.tx_delay, pkt.latitude, pkt.longitude,
-                        pkt.tx_hour, pkt.tx_minute, pkt.tx_second, pkt.tx_ms, pkt.rssi,
-                        pkt.rx_hour, pkt.rx_minute, pkt.rx_second, pkt.rx_ms);
+#if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+    void sdcard_thread(void) {
+        struct packet_data pkt;
+        while (true) {
+            if (k_msgq_get(&packet_msgq, &pkt, K_FOREVER) == 0) {
+                // Perform SD card write operation
+                append_csv(pkt.number_press, pkt.tx_delay, pkt.latitude, pkt.longitude,
+                            pkt.tx_hour, pkt.tx_minute, pkt.tx_second, pkt.tx_ms, pkt.rssi,
+                            pkt.rx_hour, pkt.rx_minute, pkt.rx_second, pkt.rx_ms);
+            }
         }
     }
-}
 
-K_THREAD_DEFINE(sdcard_tid, 2048, sdcard_thread, NULL, NULL, NULL, 5, 0, 0);
+    K_THREAD_DEFINE(sdcard_tid, 2048, sdcard_thread, NULL, NULL, NULL, 5, 0, 0);
+#endif

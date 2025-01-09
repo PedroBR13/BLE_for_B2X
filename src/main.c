@@ -1,6 +1,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <modem/nrf_modem_lib.h>
+// #include <modem/nrf_modem_lib.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/sys/reboot.h>
 #include <zephyr/bluetooth/hci.h>
@@ -12,18 +12,30 @@
 
 LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
 
-/* The devicetree node identifier for the "led0" alias. */
-#define LED0_NODE DT_ALIAS(led0)
-#define LED1_NODE DT_ALIAS(led1)
-#define LED2_NODE DT_ALIAS(led2)
-#define LED3_NODE DT_ALIAS(led3)
 
 #define SCAN_WINDOW 50
 
-static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
-static const struct gpio_dt_spec led2 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
-static const struct gpio_dt_spec led3 = GPIO_DT_SPEC_GET(LED2_NODE, gpios);
-static const struct gpio_dt_spec led4 = GPIO_DT_SPEC_GET(LED3_NODE, gpios);
+#if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+    /* The devicetree node identifier for the "led0" alias. */
+    #define LED0_NODE DT_ALIAS(led0)
+    #define LED1_NODE DT_ALIAS(led1)
+    #define LED2_NODE DT_ALIAS(led2)
+    #define LED3_NODE DT_ALIAS(led3)
+
+    static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+    static const struct gpio_dt_spec led2 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
+    static const struct gpio_dt_spec led3 = GPIO_DT_SPEC_GET(LED2_NODE, gpios);
+    static const struct gpio_dt_spec led4 = GPIO_DT_SPEC_GET(LED3_NODE, gpios);
+
+    // Timers
+    static struct k_timer timeout_timer;
+
+    static void timer_handler(struct k_timer *timer_id) {
+        LOG_INF("Time shift added");
+        k_sleep(K_MSEC(10));
+        // append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    }
+#endif
 
 // Define the runtime variables globally so they can be accessed from other files
 uint32_t runtime_ms = 0;
@@ -37,66 +49,66 @@ typedef enum {
     STATE_ERROR
 } app_state_t;
 
-static app_state_t current_state = STATE_GNSS_SEARCH;  // Initialize to GNSS search state
+static app_state_t current_state = STATE_DONE;  // Initialize to GNSS search state
 
 // Callback function for first GNSS fix
-void on_first_fix_acquired(void) {
-    LOG_INF("Switching from GNSS search to Bluetooth scanning");
-    int err = application_init();
-    if (err) {
-        LOG_ERR("Application init failed");
-        return;
-    }
-    current_state = STATE_DONE;
-}
+// void on_first_fix_acquired(void) {
+//     LOG_INF("Switching from GNSS search to Bluetooth scanning");
+//     int err = application_init();
+//     if (err) {
+//         LOG_ERR("Application init failed");
+//         return;
+//     }
+//     current_state = STATE_DONE;
+// }
 
 int main(void) {
     int err;
     LOG_INF("Starting B2B device...");
 
-    // dk_leds_init();
-
+    #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
     int ret;
-    if (!gpio_is_ready_dt(&led1)) {
-		return 0;
-	}
-    if (!gpio_is_ready_dt(&led2)) {
-		return 0;
-	}
-    if (!gpio_is_ready_dt(&led3)) {
-		return 0;
-	}
-    if (!gpio_is_ready_dt(&led4)) {
-		return 0;
-	}
+        if (!gpio_is_ready_dt(&led1)) {
+            return 0;
+        }
+        if (!gpio_is_ready_dt(&led2)) {
+            return 0;
+        }
+        if (!gpio_is_ready_dt(&led3)) {
+            return 0;
+        }
+        if (!gpio_is_ready_dt(&led4)) {
+            return 0;
+        }
 
-    gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);
-    gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);
-    
-    err = sdcard_init();
-    if (err) {
-        LOG_ERR("Failed to initialize SD Card, error: %d", err);
-        return 0;
-    } else {
-        create_csv();
-    } 
+        gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);   
+        gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);
+        
+        err = sdcard_init();
+        if (err) {
+            LOG_ERR("Failed to initialize SD Card, error: %d", err);
+            return 0;
+        } else {
+            create_csv();
+        } 
 
-    append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
-    err = nrf_modem_lib_init();
-    if (err) {
-        LOG_ERR("Failed to initialize modem, error: %d", err);
-        return -1;
-    }
+        gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
+        gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
+    #endif
 
-    // Setup GNSS with the first-fix callback
-    if (setup_gnss(on_first_fix_acquired) != 0) {
-        LOG_ERR("GNSS setup failed");
-        return -1;
-    }
+    // err = nrf_modem_lib_init();
+    // if (err) {
+    //     LOG_ERR("Failed to initialize modem, error: %d", err);
+    //     return -1;
+    // }
 
-    gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
-    gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
+    // // Setup GNSS with the first-fix callback
+    // if (setup_gnss(on_first_fix_acquired) != 0) {
+    //     LOG_ERR("GNSS setup failed");
+    //     return -1;
+    // }
 
     // Main loop
     while (true) {
@@ -107,10 +119,12 @@ int main(void) {
 
             case STATE_SCANNING:
                 // Initialize and start Bluetooth scanning
-                ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
-                if (ret < 0) {
-                    return 0;
-                }
+                #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+                    ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
+                    if (ret < 0) {
+                        return 0;
+                    }
+                #endif
 
                 // LOG_INF("Start scan");
 
@@ -129,10 +143,12 @@ int main(void) {
 
             case STATE_ADVERTISING:
                 // LOG_INF("Start beacon");
-                ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);
-                if (ret < 0) {
-                    return 0;
-                }
+                #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+                    ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);
+                    if (ret < 0) {
+                        return 0;
+                    }
+                #endif
 
                 err = advertising_start();
                 if (err) {
@@ -154,10 +170,12 @@ int main(void) {
 
             case STATE_DONE:
                 // LOG_INF("Process done. Going to scanning state");
-                gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
-                gpio_pin_configure_dt(&led2, GPIO_OUTPUT_INACTIVE);
-                gpio_pin_configure_dt(&led3, GPIO_OUTPUT_INACTIVE);
-                gpio_pin_configure_dt(&led4, GPIO_OUTPUT_INACTIVE);
+                #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+                    gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
+                    gpio_pin_configure_dt(&led2, GPIO_OUTPUT_INACTIVE);
+                    gpio_pin_configure_dt(&led3, GPIO_OUTPUT_INACTIVE);
+                    gpio_pin_configure_dt(&led4, GPIO_OUTPUT_INACTIVE);
+                #endif
 
                 // Enable BLE 
                 err = bt_enable(NULL);
@@ -186,40 +204,13 @@ int main(void) {
                     return err;
                 }
 
+                #ifdef CONFIG_BOARD_NRF52DK_NRF52832
+                    k_timer_init(&timeout_timer, timer_handler, NULL);
+                    k_timer_start(&timeout_timer, K_SECONDS(60), K_SECONDS(60));
+        	    #endif
                 
                 current_state = STATE_SCANNING;
                 break;
-
-            case STATE_ERROR:
-                // int err = bt_hci_cmd_send_sync(BT_HCI_OP_RESET, NULL, NULL);
-                // if (err) {
-                //     LOG_ERR("HCI Reset failed (err %d)\n", err);
-                // }
-                append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-
-                // err = nrf_modem_gnss_stop(); // Stop GNSS to save resources and retain state.
-                // if (err) {
-                //     LOG_ERR("GNSS stop failed");
-                //     return err;
-                // }
-                disk_unmount();
-                sys_reboot(SYS_REBOOT_COLD);
-
-                // err = bt_disable();
-                // if (err) {
-                //     LOG_ERR("Bluetooth stop failed (err %d)", err);
-                //     return err;
-                // }
-
-                // err = bt_enable(NULL);
-                // if (err) {
-                //     LOG_ERR("Bluetooth init failed (err %d)", err);
-                //     return err;
-                // }
-                
-                current_state = STATE_SCANNING;
-                break;
-
 
             default:
                 LOG_ERR("Unknown state");

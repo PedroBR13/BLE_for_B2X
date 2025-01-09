@@ -19,13 +19,14 @@ struct gnss_s {
 };
 
 // Extern declaration so it can be accessed from other files
-extern struct rtc_time_s rtc_time;
-extern struct gnss_s last_gnss_data;
+// extern struct rtc_time_s rtc_time = {0,0,0,0,0};
+// extern struct gnss_s last_gnss_data  = {52243187,6856186};
+
 
 // GNSS-related function declarations
-typedef void (*gnss_fix_callback_t)(void);  // Define callback type
+// typedef void (*gnss_fix_callback_t)(void);  // Define callback type
 
-int setup_gnss(gnss_fix_callback_t fix_cb); // Function that accepts a callback
-void update_rtc_from_gnss(void);
+// int setup_gnss(gnss_fix_callback_t fix_cb); // Function that accepts a callback
+// void update_rtc_from_gnss(void);
 
 #endif // GNSS_MODULE_H

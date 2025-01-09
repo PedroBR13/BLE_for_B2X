@@ -8,6 +8,9 @@ LOG_MODULE_REGISTER(beacon_module, LOG_LEVEL_INF);
 
 static adv_mfg_data_type adv_mfg_data;
 
+static struct rtc_time_s rtc_time = {0,0,0,0,0};
+static struct gnss_s last_gnss_data  = {52243187,6856186};
+
 struct packet_content {
     uint8_t tx_delay;
     uint16_t press_count;
