@@ -15,6 +15,21 @@ LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
 
 #define SCAN_WINDOW 50
 
+// Define the runtime variables globally so they can be accessed from other files
+uint32_t runtime_ms = 0;
+uint32_t previous_runtime_ms = 0;
+
+typedef enum {
+    STATE_GNSS_SEARCH,
+    STATE_SCANNING,
+    STATE_ADVERTISING,
+    STATE_DONE,
+    STATE_NEW_TEST_FILE,
+    STATE_ERROR
+} app_state_t;
+
+static app_state_t current_state = STATE_DONE;  // Initialize to GNSS search state
+
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
     /* The devicetree node identifier for the "led0" alias. */
     #define LED0_NODE DT_ALIAS(led0)
@@ -32,24 +47,12 @@ LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
 
     static void timer_handler(struct k_timer *timer_id) {
         LOG_INF("Time shift added");
-        k_sleep(K_MSEC(10));
-        // append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        current_state = STATE_NEW_TEST_FILE; 
+        k_sleep(K_MSEC(10));  
     }
 #endif
 
-// Define the runtime variables globally so they can be accessed from other files
-uint32_t runtime_ms = 0;
-uint32_t previous_runtime_ms = 0;
 
-typedef enum {
-    STATE_GNSS_SEARCH,
-    STATE_SCANNING,
-    STATE_ADVERTISING,
-    STATE_DONE,
-    STATE_ERROR
-} app_state_t;
-
-static app_state_t current_state = STATE_DONE;  // Initialize to GNSS search state
 
 // Callback function for first GNSS fix
 // void on_first_fix_acquired(void) {
@@ -91,8 +94,6 @@ int main(void) {
         } else {
             create_csv();
         } 
-
-        append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
         gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
@@ -138,7 +139,10 @@ int main(void) {
                 }
 
                 // Move to ADVERTISING state
-                current_state = STATE_ADVERTISING;
+                if (current_state != STATE_NEW_TEST_FILE){
+                    current_state = STATE_ADVERTISING;
+                }
+                    
                 break;
 
             case STATE_ADVERTISING:
@@ -165,7 +169,9 @@ int main(void) {
 
                 advertising_stop();
 
-                current_state = STATE_SCANNING;
+                if (current_state != STATE_NEW_TEST_FILE){
+                    current_state = STATE_SCANNING;
+                }
                 break;
 
             case STATE_DONE:
@@ -204,13 +210,22 @@ int main(void) {
                     return err;
                 }
 
-                #ifdef CONFIG_BOARD_NRF52DK_NRF52832
+                #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                     k_timer_init(&timeout_timer, timer_handler, NULL);
-                    k_timer_start(&timeout_timer, K_SECONDS(60), K_SECONDS(60));
+                    k_timer_start(&timeout_timer, K_SECONDS(10), K_SECONDS(10));
         	    #endif
                 
                 current_state = STATE_SCANNING;
                 break;
+            
+            #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+            case STATE_NEW_TEST_FILE:
+                    create_csv();
+                    current_state = STATE_SCANNING;
+                    break;
+
+            #endif
+
 
             default:
                 LOG_ERR("Unknown state");
