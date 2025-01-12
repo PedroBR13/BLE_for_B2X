@@ -7,6 +7,10 @@
 // Function to start Bluetooth scanning
 int ble_start_scanning(void);
 
+
+bool is_packet_received(void);
+void reset_packet_received(void);
+
 // Callback for Bluetooth scan results
 void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type, struct net_buf_simple *buf);
 

@@ -44,11 +44,23 @@ static app_state_t current_state = STATE_DONE;  // Initialize to GNSS search sta
 
     // Timers
     static struct k_timer timeout_timer;
+    static struct k_timer led_timer;
 
     static void timer_handler(struct k_timer *timer_id) {
         LOG_INF("Time shift added");
         current_state = STATE_NEW_TEST_FILE; 
-        k_sleep(K_MSEC(10));  
+        // k_sleep(K_MSEC(TEST_PERIOD));  
+    }
+
+    // Function to turn off the LED
+    static void led_off(struct k_timer *timer) {
+        gpio_pin_configure_dt(&led4, GPIO_OUTPUT_INACTIVE);
+    }
+
+    // Reset the LED timer and turn on the LED
+    static void reset_led_timer(void) {
+        gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);  // Turn on the LED
+        k_timer_start(&led_timer, K_MSEC(100), K_NO_WAIT);  // Reset the timer (1 second)
     }
 #endif
 
@@ -120,6 +132,7 @@ int main(void) {
 
             case STATE_SCANNING:
                 // Initialize and start Bluetooth scanning
+                reset_packet_received();
                 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                     ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
                     if (ret < 0) {
@@ -130,12 +143,23 @@ int main(void) {
                 // LOG_INF("Start scan");
 
                 // Simulate scanning duration
-                k_sleep(K_MSEC(SCAN_WINDOW));
+                k_sleep(K_MSEC(SCAN_WINDOW_MAIN));
+
+                #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+                    if (is_packet_received()) {
+                        reset_led_timer();
+                    }
+                #endif
                 
                 // keep scanning if no available data to send
                 while (!check_update_availability()) {
                     // LOG_INF("Scan interval reset due to no data to send. \n");
-                    k_sleep(K_MSEC(SCAN_WINDOW));
+                    k_sleep(K_MSEC(SCAN_WINDOW_MAIN));
+                    #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+                        if (is_packet_received()) {
+                            reset_led_timer();
+                        }
+                    #endif
                 }
 
                 // Move to ADVERTISING state
@@ -212,7 +236,8 @@ int main(void) {
 
                 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                     k_timer_init(&timeout_timer, timer_handler, NULL);
-                    k_timer_start(&timeout_timer, K_SECONDS(10), K_SECONDS(10));
+                    k_timer_start(&timeout_timer, K_SECONDS(TEST_PERIOD), K_SECONDS(TEST_PERIOD));
+                    k_timer_init(&led_timer, led_off, NULL);
         	    #endif
                 
                 current_state = STATE_SCANNING;

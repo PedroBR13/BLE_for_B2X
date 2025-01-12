@@ -28,6 +28,8 @@ struct packet_data {
 K_MSGQ_DEFINE(packet_msgq, sizeof(struct packet_data), 10, 4);
 #endif
 
+static bool packet_received = false;
+
 static struct rtc_time_s rtc_time = {0,0,0,0,0};
 
 static void parse_advertisement_data(const uint8_t *data, int len, char **name, const uint8_t **manufacturer_data, int *manufacturer_data_len) {
@@ -55,6 +57,14 @@ static void parse_advertisement_data(const uint8_t *data, int len, char **name, 
         data += field_len + 1;
         len -= field_len + 1;
     }
+}
+
+bool is_packet_received(void) {
+    return packet_received;
+}
+
+void reset_packet_received(void) {
+    packet_received = false;
 }
 
 // Function to get current time as a single integer
@@ -186,6 +196,9 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
                 if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
                     LOG_ERR("Message queue full. Dropping packet.");
                 }
+
+                // Mark that a packet was received
+                packet_received = true;
             #endif
 
             } else {
