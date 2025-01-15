@@ -9,6 +9,7 @@
 // SCAN PARAMERTERS
 #define SCAN_INTERVAL 80
 #define SCAN_WINDOW 80 // 80 = 50ms, 128 = 80 ms
+#define SCAN_WINDOW_MAIN 50  //ms
 
 
 // PACKET STRUCTURE

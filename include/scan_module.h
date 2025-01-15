@@ -11,6 +11,10 @@ int ble_start_scanning(void);
 bool is_packet_received(void);
 void reset_packet_received(void);
 
+#if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+void append_null(void);
+#endif
+
 // Callback for Bluetooth scan results
 void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type, struct net_buf_simple *buf);
 

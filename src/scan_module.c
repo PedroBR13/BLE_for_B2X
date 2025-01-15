@@ -24,6 +24,8 @@ struct packet_data {
     int8_t rssi;
 };
 
+static struct packet_data null_pkt = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
 K_MSGQ_DEFINE(packet_msgq, sizeof(struct packet_data), 10, 4);
 #endif
@@ -213,6 +215,17 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
         name = NULL;
 	}
 }
+
+#if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+    void append_null(void) {
+        struct packet_data pkt;
+        pkt = null_pkt;
+        if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
+                    LOG_ERR("Message queue full. Dropping packet.");
+                }
+
+    }
+#endif
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
     void sdcard_thread(void) {

@@ -7,13 +7,10 @@
 #include "gnss_module.h" // Include the GNSS module
 #include "scan_module.h"   // Include the BLE module
 #include "beacon_module.h"  // Include the BLE beacon module
-// #include "ble_settings.h"
+#include "ble_settings.h"
 #include "sdcard_module.h"
 
 LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
-
-
-#define SCAN_WINDOW 50
 
 // Define the runtime variables globally so they can be accessed from other files
 uint32_t runtime_ms = 0;
@@ -107,6 +104,8 @@ int main(void) {
             create_csv();
         } 
 
+        append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); 
+
         gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
         gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
     #endif
@@ -150,7 +149,7 @@ int main(void) {
                         reset_led_timer();
                     }
                 #endif
-                
+
                 // keep scanning if no available data to send
                 while (!check_update_availability()) {
                     // LOG_INF("Scan interval reset due to no data to send. \n");
@@ -181,8 +180,8 @@ int main(void) {
                 err = advertising_start();
                 if (err) {
                     LOG_ERR("Advertising start failed");
-                    current_state = STATE_ERROR;
-                    break;
+                    current_state = STATE_SCANNING;
+                    // break;
                     // return err;
                 }
 
@@ -245,10 +244,14 @@ int main(void) {
             
             #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
             case STATE_NEW_TEST_FILE:
-                    create_csv();
-                    current_state = STATE_SCANNING;
-                    break;
-
+                // while (append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) != 0) {
+                //     LOG_ERR("Failed to create CSV file. Retrying...");
+                //     k_sleep(K_MSEC(5));  // Delay before retrying to avoid rapid looping
+                // }
+                append_null();
+                // append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); 
+                current_state = STATE_SCANNING;
+                break;
             #endif
 
 
