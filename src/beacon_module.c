@@ -23,6 +23,14 @@ static bool packet_pending = false; // Indicates if a packet is waiting to be se
 static struct k_timer packet_gen_timer;
 static struct k_work packet_work;
 
+#ifdef CONFIG_BOARD_NRF9160DK_NRF52840
+#define DEVICE_NAME "B2B2"
+#else
+#define DEVICE_NAME "B2B1"
+#endif
+
+#define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
+
 static struct bt_le_ext_adv *adv_set;
 static const struct bt_data ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_NO_BREDR),

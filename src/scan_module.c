@@ -143,7 +143,12 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
     // LOG_INF("Device found: %s (RSSI %d), type %u, AD data len %u, device name: %s\n",
     //     addr_str, rssi, type, ad->len, name ? name : "(unknown)");
 
-    if (name && strcmp(name, "B2B") == 0) {
+    #ifdef CONFIG_BOARD_NRF9160DK_NRF52840
+    if (name && strcmp(name, "B2B1") == 0) {
+    #else
+    if (name && strcmp(name, "B2B2") == 0) {
+    #endif
+    // if (name && strcmp(name, "B2B") == 0) {
 			// LOG_INF("Device found: %s (RSSI %d), type %u, AD data len %u, device name: %s\n",
 			// 				addr_str, rssi, type, ad->len,name);
 
