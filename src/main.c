@@ -180,8 +180,9 @@ int main(void) {
                 err = advertising_start();
                 if (err) {
                     LOG_ERR("Advertising start failed");
-                    current_state = STATE_SCANNING;
-                    // break;
+                    append_error();
+                    current_state = STATE_NEW_TEST_FILE;
+                    break;
                     // return err;
                 }
 
@@ -244,12 +245,7 @@ int main(void) {
             
             #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
             case STATE_NEW_TEST_FILE:
-                // while (append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) != 0) {
-                //     LOG_ERR("Failed to create CSV file. Retrying...");
-                //     k_sleep(K_MSEC(5));  // Delay before retrying to avoid rapid looping
-                // }
                 append_null();
-                // append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); 
                 current_state = STATE_SCANNING;
                 break;
             #endif

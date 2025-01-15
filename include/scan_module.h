@@ -13,6 +13,7 @@ void reset_packet_received(void);
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
 void append_null(void);
+void append_error(void);
 #endif
 
 // Callback for Bluetooth scan results

@@ -25,6 +25,7 @@ struct packet_data {
 };
 
 static struct packet_data null_pkt = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static struct packet_data error_pkt = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
 K_MSGQ_DEFINE(packet_msgq, sizeof(struct packet_data), 10, 4);
@@ -225,6 +226,15 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
     void append_null(void) {
         struct packet_data pkt;
         pkt = null_pkt;
+        if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
+                    LOG_ERR("Message queue full. Dropping packet.");
+                }
+
+    }
+
+    void append_error(void) {
+        struct packet_data pkt;
+        pkt = error_pkt;
         if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
                     LOG_ERR("Message queue full. Dropping packet.");
                 }
