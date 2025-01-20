@@ -10,6 +10,7 @@ int ble_start_scanning(void);
 
 bool is_packet_received(void);
 void reset_packet_received(void);
+void reset_last_packet_time(void);
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
 void append_null(void);

@@ -22,10 +22,11 @@ struct packet_data {
     uint8_t rx_second;
     uint16_t rx_ms;
     int8_t rssi;
+    uint32_t aoi;
 };
 
-static struct packet_data null_pkt = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static struct packet_data error_pkt = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+static struct packet_data null_pkt = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static struct packet_data error_pkt = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
 K_MSGQ_DEFINE(packet_msgq, sizeof(struct packet_data), 10, 4);
@@ -34,6 +35,13 @@ K_MSGQ_DEFINE(packet_msgq, sizeof(struct packet_data), 10, 4);
 static bool packet_received = false;
 
 static struct rtc_time_s rtc_time = {0,0,0,0,0};
+
+// Add a variable to store the timestamp of the last packet
+static uint32_t last_packet_time = 0;
+
+void reset_last_packet_time(void) {
+    last_packet_time = k_uptime_get();
+}
 
 static void parse_advertisement_data(const uint8_t *data, int len, char **name, const uint8_t **manufacturer_data, int *manufacturer_data_len) {
     while (len > 0) {
@@ -131,6 +139,7 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
 
     // Get the current time as a string
     uint32_t current_time = get_current_time_packed();
+    uint32_t uptime = k_uptime_get();
 
     // Parse the advertisement data
 	uint16_t *data = ad->data;
@@ -155,6 +164,19 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
 
 			if (manufacturer_data && manufacturer_data_len >= sizeof(adv_mfg_data_type)) {
             adv_mfg_data_type *data = (adv_mfg_data_type *)manufacturer_data;
+
+            // Calculate the duration since the last packet
+            uint32_t duration_since_last_packet = 0;
+            
+            if (last_packet_time != 0) {
+                if (uptime >= last_packet_time) {
+                    duration_since_last_packet = uptime - last_packet_time;
+                } else {
+                    // Handle wrap-around case for a 32-bit timestamp
+                    duration_since_last_packet = (UINT32_MAX - last_packet_time) + uptime + 1;
+                }
+            }
+            last_packet_time = uptime; // Update the last packet time
 
             uint16_t number_press = data->number_press[0];
             uint16_t tx_delay = data->tx_delay[0];
@@ -199,6 +221,7 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
             pkt.rx_second = current_second;
             pkt.rx_ms = current_ms;
             pkt.rssi = rssi;
+            pkt.aoi = duration_since_last_packet;
             
             #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                 if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
@@ -250,7 +273,7 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
                 // Perform SD card write operation
                 append_csv(pkt.number_press, pkt.tx_delay, pkt.latitude, pkt.longitude,
                             pkt.tx_hour, pkt.tx_minute, pkt.tx_second, pkt.tx_ms, pkt.rssi,
-                            pkt.rx_hour, pkt.rx_minute, pkt.rx_second, pkt.rx_ms);
+                            pkt.rx_hour, pkt.rx_minute, pkt.rx_second, pkt.rx_ms,pkt.aoi);
             }
         }
     }

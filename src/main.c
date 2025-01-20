@@ -104,7 +104,7 @@ int main(void) {
             create_csv();
         } 
 
-        append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); 
+        append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); 
 
         gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
         gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
@@ -243,6 +243,8 @@ int main(void) {
                     k_timer_start(&timeout_timer, K_SECONDS(TEST_PERIOD), K_SECONDS(TEST_PERIOD));
                     k_timer_init(&led_timer, led_off, NULL);
         	    #endif
+
+                reset_last_packet_time();
                 
                 current_state = STATE_SCANNING;
                 break;
@@ -250,6 +252,7 @@ int main(void) {
             #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
             case STATE_NEW_TEST_FILE:
                 append_null();
+                reset_last_packet_time();
                 current_state = STATE_SCANNING;
                 break;
             #endif

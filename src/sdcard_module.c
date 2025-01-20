@@ -106,7 +106,7 @@ int create_csv(void)
 /* Append to a CSV file */
 int append_csv(uint16_t number_press, uint16_t tx_delay, uint32_t latitude, uint32_t longitude, 
               uint8_t tx_hour, uint8_t tx_minute, uint8_t tx_second, uint16_t tx_ms,int8_t rssi,
-              uint8_t rx_hour, uint8_t rx_minute, uint8_t rx_second, uint16_t rx_ms) {
+              uint8_t rx_hour, uint8_t rx_minute, uint8_t rx_second, uint16_t rx_ms, uint32_t aoi) {
     char csv_folder_path[128];
     char csv_file_path[128];
     struct fs_file_t file;
@@ -128,10 +128,10 @@ int append_csv(uint16_t number_press, uint16_t tx_delay, uint32_t latitude, uint
     /* Append a new row */
     char buffer[124];
 
-    // timestamp_id, timestamp_tx, tx_delay,timestamp_rx, number_press, latitude, longitude, rssi
-    int written = snprintf(buffer, sizeof(buffer), "%02u%02u%02u%03u,%02u:%02u:%02u.%03u,%u,%02u:%02u:%02u.%03u,%u,%u,%u,%d\n",
+    // timestamp_id, timestamp_tx, tx_delay,timestamp_rx, number_press, latitude, longitude, rssi, aoi
+    int written = snprintf(buffer, sizeof(buffer), "%02u%02u%02u%03u,%02u:%02u:%02u.%03u,%u,%02u:%02u:%02u.%03u,%u,%u,%u,%d,%u\n",
                         tx_hour, tx_minute, tx_second, tx_ms, tx_hour, tx_minute, tx_second, tx_ms,tx_delay,
-                        rx_hour, rx_minute, rx_second, rx_ms,number_press,latitude,longitude, rssi);
+                        rx_hour, rx_minute, rx_second, rx_ms,number_press,latitude,longitude, rssi, aoi);
 
     res = fs_write(&file, buffer, written);
     if (res < 0) {
