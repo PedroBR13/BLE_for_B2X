@@ -180,10 +180,14 @@ int main(void) {
                 err = advertising_start();
                 if (err) {
                     LOG_ERR("Advertising start failed");
+                    #ifdef CONFIG_BOARD_NRF9160DK_NRF52840
+                    return err;
+                    #else
+                    return err;
                     append_error();
                     current_state = STATE_NEW_TEST_FILE;
                     break;
-                    // return err;
+                    #endif
                 }
 
                 // Wait here until advertising completes
