@@ -27,6 +27,8 @@ typedef enum {
 
 static app_state_t current_state = STATE_DONE;  // Initialize to GNSS search state
 
+static uint8_t test_count = 0;
+
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
     /* The devicetree node identifier for the "led0" alias. */
     #define LED0_NODE DT_ALIAS(led0)
@@ -44,9 +46,7 @@ static app_state_t current_state = STATE_DONE;  // Initialize to GNSS search sta
     static struct k_timer led_timer;
 
     static void timer_handler(struct k_timer *timer_id) {
-        LOG_INF("Time shift added");
         current_state = STATE_NEW_TEST_FILE; 
-        // k_sleep(K_MSEC(TEST_PERIOD));  
     }
 
     // Function to turn off the LED
@@ -232,6 +232,8 @@ int main(void) {
                     return err;
                 }
 
+                switch_recording(true);
+
                 err = ble_start_scanning();
                 if (err) {
                     LOG_ERR("BLE scanning start failed");
@@ -245,6 +247,8 @@ int main(void) {
         	    #endif
 
                 reset_last_packet_time();
+
+                LOG_INF("Msg generation: %d ms / Number of copies: %d / Test: %s", INTERVAL, PACKET_COPIES,CSV_TEST_NAME);
                 
                 current_state = STATE_SCANNING;
                 break;
@@ -253,6 +257,12 @@ int main(void) {
             case STATE_NEW_TEST_FILE:
                 append_null();
                 reset_last_packet_time();
+                switch_recording(false);
+                LOG_INF("Time shift added");
+                test_count++;
+                k_sleep(K_MSEC(10));
+                LOG_INF("New test started. Test count: %u", test_count);
+                switch_recording(true);
                 current_state = STATE_SCANNING;
                 break;
             #endif

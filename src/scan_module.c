@@ -34,6 +34,8 @@ K_MSGQ_DEFINE(packet_msgq, sizeof(struct packet_data), 10, 4);
 
 static bool packet_received = false;
 
+static bool sd_record = false;
+
 static struct rtc_time_s rtc_time = {0,0,0,0,0};
 
 // Add a variable to store the timestamp of the last packet
@@ -41,6 +43,10 @@ static uint32_t last_packet_time = 0;
 
 void reset_last_packet_time(void) {
     last_packet_time = k_uptime_get();
+}
+
+void switch_recording(bool state) {
+    sd_record = state;
 }
 
 static void parse_advertisement_data(const uint8_t *data, int len, char **name, const uint8_t **manufacturer_data, int *manufacturer_data_len) {
@@ -133,36 +139,36 @@ int ble_start_scanning(void) {
 
 // Bluetooth scan callback
 void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf_simple *ad) {
-    char addr_str[BT_ADDR_LE_STR_LEN];
-    bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
-    struct packet_data pkt;
+    if (sd_record == true) {
+        char addr_str[BT_ADDR_LE_STR_LEN];
+        bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
+        struct packet_data pkt;
 
-    // Get the current time as a string
-    uint32_t current_time = get_current_time_packed();
-    uint32_t uptime = k_uptime_get();
+        // Get the current time as a string
+        uint32_t current_time = get_current_time_packed();
+        uint32_t uptime = k_uptime_get();
 
-    // Parse the advertisement data
-	uint16_t *data = ad->data;
-	int len = ad->len;
-	char *name = NULL;
-	const uint16_t *manufacturer_data = NULL;
-	int manufacturer_data_len = 0;
+        // Parse the advertisement data
+        uint16_t *data = ad->data;
+        int len = ad->len;
+        char *name = NULL;
+        const uint16_t *manufacturer_data = NULL;
+        int manufacturer_data_len = 0;
 
-	parse_advertisement_data(ad->data, ad->len, &name, &manufacturer_data, &manufacturer_data_len);
+        parse_advertisement_data(ad->data, ad->len, &name, &manufacturer_data, &manufacturer_data_len);
 
-    // LOG_INF("Device found: %s (RSSI %d), type %u, AD data len %u, device name: %s\n",
-    //     addr_str, rssi, type, ad->len, name ? name : "(unknown)");
+        // LOG_INF("Device found: %s (RSSI %d), type %u, AD data len %u, device name: %s\n",
+        //     addr_str, rssi, type, ad->len, name ? name : "(unknown)");
 
-    #ifdef CONFIG_BOARD_NRF9160DK_NRF52840
-    if (name && strcmp(name, "B2B1") == 0) {
-    #else
-    if (name && strcmp(name, "B2B2") == 0) {
-    #endif
-    // if (name && strcmp(name, "B2B") == 0) {
-			// LOG_INF("Device found: %s (RSSI %d), type %u, AD data len %u, device name: %s\n",
-			// 				addr_str, rssi, type, ad->len,name);
+        #ifdef CONFIG_BOARD_NRF9160DK_NRF52840
+        if (name && strcmp(name, "B2B1") == 0) {
+        #else
+        if (name && strcmp(name, "B2B2") == 0) {
+        #endif
+            // LOG_INF("Device found: %s (RSSI %d), type %u, AD data len %u, device name: %s\n",
+            //                 addr_str, rssi, type, ad->len,name);
 
-			if (manufacturer_data && manufacturer_data_len >= sizeof(adv_mfg_data_type)) {
+            if (manufacturer_data && manufacturer_data_len >= sizeof(adv_mfg_data_type)) {
             adv_mfg_data_type *data = (adv_mfg_data_type *)manufacturer_data;
 
             // Calculate the duration since the last packet
@@ -183,7 +189,7 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
             uint32_t longitude = data->longitude[0];
             uint32_t tx_timestamp = data->timestamp[0];
 
-             // Raw byte values for latitude
+            // Raw byte values for latitude
             uint32_t raw_latitude[4];
             memcpy(raw_latitude, &data->latitude[0], sizeof(raw_latitude));
 
@@ -235,14 +241,14 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
             } else {
                 // LOG_INF("Invalid manufacturer-specific data length\n");
                 LOG_INF("Invalid manufacturer data length: %d (expected %d)", manufacturer_data_len, sizeof(adv_mfg_data_type));
-            }
-		
-	}
+            }   
+        }
 
-	if (name) {
-        free(name);
-        name = NULL;
-	}
+        if (name) {
+            free(name);
+            name = NULL;
+        }
+    }
 }
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)

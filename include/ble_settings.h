@@ -2,8 +2,10 @@
 #define BLE_SETTINGS_H
 
 // ADVERTISING PARAMETERS
+
 #define PACKET_COPIES 3
-#define PACKET_GEN_INTERVAL K_MSEC(200)  // Frequency X in seconds
+#define INTERVAL 200
+#define PACKET_GEN_INTERVAL K_MSEC(INTERVAL)  // Frequency X in seconds
 #define ADV_INTERVAL 32 // 20ms
 
 // SCAN PARAMERTERS
