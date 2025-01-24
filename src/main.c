@@ -248,7 +248,7 @@ int main(void) {
 
                 reset_last_packet_time();
 
-                LOG_INF("Msg generation: %d ms / Number of copies: %d / Test: %s", INTERVAL, PACKET_COPIES,CSV_TEST_NAME);
+                LOG_INF("Msg generation: %d ms / Number of copies: %d / Test: %s / Time shift: %d ms", INTERVAL, PACKET_COPIES,CSV_TEST_NAME, TEST_SHIFT);
                 
                 current_state = STATE_SCANNING;
                 break;
@@ -257,11 +257,25 @@ int main(void) {
             case STATE_NEW_TEST_FILE:
                 append_null();
                 reset_last_packet_time();
+
+                err = application_stop();
+                if (err) {
+                    LOG_ERR("Application stop failed");
+                    return err;
+                }
+
                 switch_recording(false);
                 LOG_INF("Time shift added");
                 test_count++;
-                k_sleep(K_MSEC(10));
+                k_sleep(K_MSEC(TEST_SHIFT));
                 LOG_INF("New test started. Test count: %u", test_count);
+
+                err = application_init();
+                if (err) {
+                    LOG_ERR("Application init failed");
+                    return err;
+                }
+
                 switch_recording(true);
                 current_state = STATE_SCANNING;
                 break;

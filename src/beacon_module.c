@@ -128,6 +128,22 @@ int application_init(void) {
     return 0;
 }
 
+int application_stop(void) {
+    // Stop the packet generation timer
+    k_timer_stop(&packet_gen_timer);
+
+    // Cancel any pending work in the work queue
+    int ret = k_work_cancel(&packet_work);
+    if (ret == -EINPROGRESS) {
+        // If the work is currently being executed, wait for it to finish
+        k_work_flush(&packet_work, NULL);
+    }
+
+    LOG_INF("Application stopped: Timer and work queue reset");
+    return 0;
+}
+
+
 int advertising_module_init(void) {
     int err;
 
