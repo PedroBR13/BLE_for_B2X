@@ -44,6 +44,12 @@ LOG_MODULE_REGISTER(sdcard_module);
 static const char *disk_mount_pt = DISK_MOUNT_PT;
 static int file_index = -1;
 
+void (*error_handler)(const char *error_message) = NULL;
+
+void set_error_handler(void (*handler)(const char *)) {
+    error_handler = handler;
+}
+
 int create_csv(void)
 {
     char csv_folder_path[150];
@@ -68,6 +74,9 @@ int create_csv(void)
         res = fs_mkdir(csv_folder_path);
         if (res < 0) {
             LOG_ERR("Failed to create folder %s (err: %d)", csv_folder_path, res);
+            if (error_handler) {
+                error_handler("Failed to create folder");
+            }
             return -1;
         }
     } else {
@@ -93,6 +102,9 @@ int create_csv(void)
     res = fs_open(&file, csv_file_path, FS_O_WRITE | FS_O_CREATE);
     if (res < 0) {
         LOG_ERR("Failed to create file %s (err: %d)", csv_file_path, res);
+        if (error_handler) {
+            error_handler("Failed to create file");
+        }
         return -1;
     }
 
@@ -122,6 +134,9 @@ int append_csv(uint16_t number_press, uint16_t tx_delay, uint32_t latitude, uint
     res = fs_open(&file, csv_file_path,  FS_O_WRITE | FS_O_APPEND );
     if (res < 0) {
         LOG_ERR("Failed to open file %s for appending (err: %d)", csv_file_path, res);
+        if (error_handler) {
+            error_handler("Failed to open to append file");
+        }
         return 0;
     }
 
@@ -136,6 +151,9 @@ int append_csv(uint16_t number_press, uint16_t tx_delay, uint32_t latitude, uint
     res = fs_write(&file, buffer, written);
     if (res < 0) {
         LOG_ERR("Failed to append data to %s (err: %d)", csv_file_path, res);
+        if (error_handler) {
+            error_handler("Failed to append to file");
+        }
         fs_close(&file);
         return false;
     } 

@@ -269,9 +269,7 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
                 }
 
     }
-#endif
 
-#if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
     void sdcard_thread(void) {
         struct packet_data pkt;
         while (true) {
@@ -285,4 +283,10 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
     }
 
     K_THREAD_DEFINE(sdcard_tid, 2048, sdcard_thread, NULL, NULL, NULL, 5, 0, 0);
+
+    void reset_packet_queue(void)
+    {
+        k_msgq_purge(&packet_msgq); // Clears all pending messages in the queue
+        LOG_INF("Packet message queue has been reset.");
+    }
 #endif

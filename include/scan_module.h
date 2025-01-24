@@ -12,6 +12,7 @@ bool is_packet_received(void);
 void reset_packet_received(void);
 void reset_last_packet_time(void);
 void switch_recording(bool state);
+void reset_packet_queue(void);
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
 void append_null(void);

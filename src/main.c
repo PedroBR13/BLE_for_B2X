@@ -29,6 +29,14 @@ static app_state_t current_state = STATE_DONE;  // Initialize to GNSS search sta
 
 static uint8_t test_count = 0;
 
+void error_callback(const char *error_message)
+{
+    LOG_ERR("SD Card Error: %s", error_message);
+    reset_packet_queue();
+    append_error();
+    current_state = STATE_NEW_TEST_FILE;
+}
+
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
     /* The devicetree node identifier for the "led0" alias. */
     #define LED0_NODE DT_ALIAS(led0)
@@ -95,6 +103,9 @@ int main(void) {
 
         gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);   
         gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);
+
+        // Register the error callback with the SD card module
+        set_error_handler(error_callback);
         
         err = sdcard_init();
         if (err) {
