@@ -150,6 +150,12 @@ int main(void) {
                     }
                 #endif
 
+                err = ble_start_scanning();
+                if (err) {
+                    LOG_ERR("BLE scanning start failed");
+                    return err;
+                }
+
                 // LOG_INF("Start scan");
 
                 // Simulate scanning duration
@@ -172,6 +178,13 @@ int main(void) {
                     #endif
                 }
 
+                err = bt_le_scan_stop();
+                if (err) {
+                    LOG_ERR("Stopping scanning failed (err %d)\n", err);
+                    return 0;
+                }
+
+                // LOG_INF("Scan stopped");
                 // Move to ADVERTISING state
                 if (current_state != STATE_NEW_TEST_FILE){
                     current_state = STATE_ADVERTISING;
@@ -204,6 +217,7 @@ int main(void) {
                 // Wait here until advertising completes
                 while (!get_adv_progress()) {
                     k_sleep(K_MSEC(10)); // Small delay to avoid CPU overuse
+                    // LOG_INF("transmission not done");
                 }
 
                 advertising_stop();
@@ -245,11 +259,6 @@ int main(void) {
 
                 switch_recording(true);
 
-                err = ble_start_scanning();
-                if (err) {
-                    LOG_ERR("BLE scanning start failed");
-                    return err;
-                }
 
                 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                     k_timer_init(&timeout_timer, timer_handler, NULL);

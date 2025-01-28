@@ -171,6 +171,7 @@ int advertising_start(void) {
         advertising_complete_flag = true;
         return 0;
     }
+    advertising_complete_flag = false;
 
     // Update adv_mfg_data with the current packet content
     adv_mfg_data.number_press[0] = current_packet.press_count;
