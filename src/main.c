@@ -278,25 +278,26 @@ int main(void) {
                 append_null();
                 reset_last_packet_time();
 
-                err = application_stop();
-                if (err) {
-                    LOG_ERR("Application stop failed");
-                    return err;
-                }
+                // err = application_stop();
+                // if (err) {
+                //     LOG_ERR("Application stop failed");
+                //     return err;
+                // }
 
                 switch_recording(false);
-                LOG_INF("Time shift added");
-                test_count++;
-                k_sleep(K_MSEC(TEST_SHIFT));
-                LOG_INF("New test started. Test count: %u", test_count);
-
-                err = application_init();
-                if (err) {
-                    LOG_ERR("Application init failed");
-                    return err;
-                }
-
+                trigger_time_shift();
+                // LOG_INF("Time shift added");
+                
+                // k_sleep(K_MSEC(TEST_SHIFT));
                 switch_recording(true);
+                test_count++;
+                LOG_INF("New test started. Test count: %u \n", test_count);
+
+                // err = application_init();
+                // if (err) {
+                //     LOG_ERR("Application init failed");
+                //     return err;
+                // }
                 current_state = STATE_SCANNING;
                 break;
             #endif

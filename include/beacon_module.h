@@ -13,5 +13,6 @@ int application_stop(void);
 bool get_adv_progress(void);
 bool check_update_availability(void);
 int advertising_stop(void);
+void trigger_time_shift(void);
 
 #endif // BEACON_MODULE_H

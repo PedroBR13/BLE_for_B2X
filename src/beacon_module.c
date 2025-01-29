@@ -3,6 +3,7 @@
 #include "ble_settings.h"
 #include "beacon_module.h"
 #include "gnss_module.h"
+#include "sdcard_module.h"
 
 LOG_MODULE_REGISTER(beacon_module, LOG_LEVEL_INF);
 
@@ -19,6 +20,7 @@ struct packet_content {
 
 static struct packet_content current_packet; // Single-packet buffer
 static bool packet_pending = false; // Indicates if a packet is waiting to be served
+static uint32_t override_interval = 0;  // 0 means no override
 
 static struct k_timer packet_gen_timer;
 static struct k_work packet_work;
@@ -107,6 +109,7 @@ static void delayed_packet_enqueue(struct k_work *work) {
     // Populate new packet content
     current_packet.tx_delay = k_uptime_get_32();
     current_packet.press_count = adv_mfg_data.number_press[0] + 1;
+    // LOG_INF("Packet generated");
 
     // Simulate network layer delay
     random_delay(11, 20);
@@ -118,6 +121,17 @@ static void delayed_packet_enqueue(struct k_work *work) {
 
 static void generate_packet_data(struct k_timer *dummy) {
     k_work_submit(&packet_work);  // Schedule work to handle delay and queue
+
+    // Check if an override interval is set
+    if (override_interval) {
+        k_timer_start(&packet_gen_timer, K_MSEC(override_interval), PACKET_GEN_INTERVAL);
+        override_interval = 0;  // Reset after one-time use
+    }
+}
+
+// Function to modify the interval for only one iteration
+void trigger_time_shift(void) {
+    override_interval = TEST_SHIFT + INTERVAL;
 }
 
 // Initialize the timer for packet generation
