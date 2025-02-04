@@ -38,35 +38,39 @@ void error_callback(const char *error_message)
 }
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-    /* The devicetree node identifier for the "led0" alias. */
-    #define LED0_NODE DT_ALIAS(led0)
-    #define LED1_NODE DT_ALIAS(led1)
-    #define LED2_NODE DT_ALIAS(led2)
-    #define LED3_NODE DT_ALIAS(led3)
+        /* The devicetree node identifier for the "led0" alias. */
+        #define LED0_NODE DT_ALIAS(led0)
+        #define LED1_NODE DT_ALIAS(led1)
+        #define LED2_NODE DT_ALIAS(led2)
+        #define LED3_NODE DT_ALIAS(led3)
 
-    static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
-    static const struct gpio_dt_spec led2 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
-    static const struct gpio_dt_spec led3 = GPIO_DT_SPEC_GET(LED2_NODE, gpios);
-    static const struct gpio_dt_spec led4 = GPIO_DT_SPEC_GET(LED3_NODE, gpios);
+        static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+        static const struct gpio_dt_spec led2 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
+        static const struct gpio_dt_spec led3 = GPIO_DT_SPEC_GET(LED2_NODE, gpios);
+        static const struct gpio_dt_spec led4 = GPIO_DT_SPEC_GET(LED3_NODE, gpios);
+        
+        // Timers
+        #if ROLE
+            static struct k_timer timeout_timer;
+        #endif
+        static struct k_timer led_timer;
 
-    // Timers
-    static struct k_timer timeout_timer;
-    static struct k_timer led_timer;
+        // Function to turn off the LED
+        static void led_off(struct k_timer *timer) {
+            gpio_pin_configure_dt(&led4, GPIO_OUTPUT_INACTIVE);
+        }
+        
+        // Reset the LED timer and turn on the LED
+        static void reset_led_timer(void) {
+            gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);  // Turn on the LED
+            k_timer_start(&led_timer, K_MSEC(100), K_NO_WAIT);  // Reset the timer (1 second)
+        }
 
-    static void timer_handler(struct k_timer *timer_id) {
-        current_state = STATE_NEW_TEST_FILE; 
-    }
-
-    // Function to turn off the LED
-    static void led_off(struct k_timer *timer) {
-        gpio_pin_configure_dt(&led4, GPIO_OUTPUT_INACTIVE);
-    }
-
-    // Reset the LED timer and turn on the LED
-    static void reset_led_timer(void) {
-        gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);  // Turn on the LED
-        k_timer_start(&led_timer, K_MSEC(100), K_NO_WAIT);  // Reset the timer (1 second)
-    }
+    #if ROLE
+        static void timer_handler(struct k_timer *timer_id) {
+            current_state = STATE_NEW_TEST_FILE; 
+        }     
+    #endif
 #endif
 
 
@@ -87,7 +91,7 @@ int main(void) {
     LOG_INF("Starting B2B device...");
 
     #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-    int ret;
+        int ret;
         if (!gpio_is_ready_dt(&led1)) {
             return 0;
         }
@@ -101,24 +105,27 @@ int main(void) {
             return 0;
         }
 
-        gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);   
-        gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);
+        #if ROLE
 
-        // Register the error callback with the SD card module
-        set_error_handler(error_callback);
-        
-        err = sdcard_init();
-        if (err) {
-            LOG_ERR("Failed to initialize SD Card, error: %d", err);
-            return 0;
-        } else {
-            create_csv();
-        } 
+            gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);   
+            gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);
 
-        append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); 
+            // Register the error callback with the SD card module
+            set_error_handler(error_callback);
+            
+            err = sdcard_init();
+            if (err) {
+                LOG_ERR("Failed to initialize SD Card, error: %d", err);
+                return 0;
+            } else {
+                create_csv();
+            } 
 
-        gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
-        gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
+            append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); 
+
+            gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
+            gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
+        #endif
     #endif
 
     // err = nrf_modem_lib_init();
@@ -261,45 +268,50 @@ int main(void) {
 
 
                 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-                    k_timer_init(&timeout_timer, timer_handler, NULL);
-                    k_timer_start(&timeout_timer, K_SECONDS(TEST_PERIOD), K_SECONDS(TEST_PERIOD));
+                    #if ROLE
+                        k_timer_init(&timeout_timer, timer_handler, NULL);
+                        k_timer_start(&timeout_timer, K_SECONDS(TEST_PERIOD), K_SECONDS(TEST_PERIOD));
+                    #endif
                     k_timer_init(&led_timer, led_off, NULL);
         	    #endif
 
                 reset_last_packet_time();
 
-                LOG_INF("Msg generation: %d ms / Number of copies: %d / Test: %s / Time shift: %d ms", INTERVAL, PACKET_COPIES,CSV_TEST_NAME, TEST_SHIFT);
+                LOG_INF("Msg generation: %d ms / Number of copies: %d / Scan Window: %d ms / Test: %s / Time shift: %d ms / Role: %d", 
+                INTERVAL, PACKET_COPIES,SCAN_WINDOW_MAIN,CSV_TEST_NAME, TEST_SHIFT,ROLE);
                 
                 current_state = STATE_SCANNING;
                 break;
             
             #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-            case STATE_NEW_TEST_FILE:
-                append_null();
-                reset_last_packet_time();
+            #if ROLE
+                case STATE_NEW_TEST_FILE:
+                    append_null();
+                    reset_last_packet_time();
 
-                // err = application_stop();
-                // if (err) {
-                //     LOG_ERR("Application stop failed");
-                //     return err;
-                // }
+                    // err = application_stop();
+                    // if (err) {
+                    //     LOG_ERR("Application stop failed");
+                    //     return err;
+                    // }
 
-                switch_recording(false);
-                trigger_time_shift();
-                // LOG_INF("Time shift added");
-                
-                // k_sleep(K_MSEC(TEST_SHIFT));
-                switch_recording(true);
-                test_count++;
-                LOG_INF("New test started. Test count: %u \n", test_count);
+                    switch_recording(false);
+                    trigger_time_shift();
+                    // LOG_INF("Time shift added");
+                    
+                    // k_sleep(K_MSEC(TEST_SHIFT));
+                    switch_recording(true);
+                    test_count++;
+                    LOG_INF("New test started. Test count: %u \n", test_count);
 
-                // err = application_init();
-                // if (err) {
-                //     LOG_ERR("Application init failed");
-                //     return err;
-                // }
-                current_state = STATE_SCANNING;
-                break;
+                    // err = application_init();
+                    // if (err) {
+                    //     LOG_ERR("Application init failed");
+                    //     return err;
+                    // }
+                    current_state = STATE_SCANNING;
+                    break;
+                #endif
             #endif
 
 

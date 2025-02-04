@@ -29,7 +29,9 @@ static struct packet_data null_pkt = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static struct packet_data error_pkt = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-K_MSGQ_DEFINE(packet_msgq, sizeof(struct packet_data), 10, 4);
+    #if ROLE
+        K_MSGQ_DEFINE(packet_msgq, sizeof(struct packet_data), 10, 4);
+    #endif
 #endif
 
 static bool packet_received = false;
@@ -163,7 +165,11 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
         #ifdef CONFIG_BOARD_NRF9160DK_NRF52840
         if (name && strcmp(name, "B2B1") == 0) {
         #else
-        if (name && strcmp(name, "B2B2") == 0) {
+            #if ROLE
+                if (name && strcmp(name, "B2B2") == 0) {
+            #else
+                if (name && strcmp(name, "B2B1") == 0) {
+            #endif
         #endif
             // LOG_INF("Device found: %s (RSSI %d), type %u, AD data len %u, device name: %s\n",
             //                 addr_str, rssi, type, ad->len,name);
@@ -230,12 +236,14 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
             pkt.aoi = duration_since_last_packet;
             
             #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-                if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
-                    LOG_ERR("Message queue full. Dropping packet.");
-                }
+                #if ROLE
+                    if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
+                        LOG_ERR("Message queue full. Dropping packet.");
+                    }
 
-                // Mark that a packet was received
-                packet_received = true;
+                    // Mark that a packet was received
+                    packet_received = true;
+                #endif
             #endif
 
             } else {
@@ -252,41 +260,43 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
 }
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-    void append_null(void) {
-        struct packet_data pkt;
-        pkt = null_pkt;
-        if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
-                    LOG_ERR("Message queue full. Dropping packet.");
+    #if ROLE
+        void append_null(void) {
+            struct packet_data pkt;
+            pkt = null_pkt;
+            if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
+                        LOG_ERR("Message queue full. Dropping packet.");
+                    }
+
+        }
+
+        void append_error(void) {
+            struct packet_data pkt;
+            pkt = error_pkt;
+            if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
+                        LOG_ERR("Message queue full. Dropping packet.");
+                    }
+
+        }
+
+        void sdcard_thread(void) {
+            struct packet_data pkt;
+            while (true) {
+                if (k_msgq_get(&packet_msgq, &pkt, K_FOREVER) == 0) {
+                    // Perform SD card write operation
+                    append_csv(pkt.number_press, pkt.tx_delay, pkt.latitude, pkt.longitude,
+                                pkt.tx_hour, pkt.tx_minute, pkt.tx_second, pkt.tx_ms, pkt.rssi,
+                                pkt.rx_hour, pkt.rx_minute, pkt.rx_second, pkt.rx_ms,pkt.aoi);
                 }
-
-    }
-
-    void append_error(void) {
-        struct packet_data pkt;
-        pkt = error_pkt;
-        if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
-                    LOG_ERR("Message queue full. Dropping packet.");
-                }
-
-    }
-
-    void sdcard_thread(void) {
-        struct packet_data pkt;
-        while (true) {
-            if (k_msgq_get(&packet_msgq, &pkt, K_FOREVER) == 0) {
-                // Perform SD card write operation
-                append_csv(pkt.number_press, pkt.tx_delay, pkt.latitude, pkt.longitude,
-                            pkt.tx_hour, pkt.tx_minute, pkt.tx_second, pkt.tx_ms, pkt.rssi,
-                            pkt.rx_hour, pkt.rx_minute, pkt.rx_second, pkt.rx_ms,pkt.aoi);
             }
         }
-    }
 
-    K_THREAD_DEFINE(sdcard_tid, 2048, sdcard_thread, NULL, NULL, NULL, 5, 0, 0);
+        K_THREAD_DEFINE(sdcard_tid, 2048, sdcard_thread, NULL, NULL, NULL, 5, 0, 0);
 
-    void reset_packet_queue(void)
-    {
-        k_msgq_purge(&packet_msgq); // Clears all pending messages in the queue
-        LOG_INF("Packet message queue has been reset.");
-    }
+        void reset_packet_queue(void)
+        {
+            k_msgq_purge(&packet_msgq); // Clears all pending messages in the queue
+            LOG_INF("Packet message queue has been reset.");
+        }
+    #endif
 #endif

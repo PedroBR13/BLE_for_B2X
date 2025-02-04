@@ -26,9 +26,13 @@ static struct k_timer packet_gen_timer;
 static struct k_work packet_work;
 
 #ifdef CONFIG_BOARD_NRF9160DK_NRF52840
-#define DEVICE_NAME "B2B2"
+    #define DEVICE_NAME "B2B2"
 #else
-#define DEVICE_NAME "B2B1"
+    #if ROLE
+        #define DEVICE_NAME "B2B1"
+    #else
+        #define DEVICE_NAME "B2B2"
+    #endif
 #endif
 
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
@@ -227,31 +231,11 @@ int advertising_start(void) {
         return err;
     }
 
-
-    // LOG_INF("Advertising started with updated packet content. Press count: %d",
-    //         adv_mfg_data.number_press[0]);
-
     return 0;
 }
 
 int advertising_stop(void) {
     // Stop the advertising
-    // if (update_availability_flag) {
-    //     int err = bt_le_ext_adv_stop(adv_set);
-    //     if (err) {
-    //         LOG_ERR("Failed to stop advertising (err %d)\n", err);
-    //         return err;
-    //     }
-
-    //     // LOG_INF("Advertising stopped successfully.");
-    //     update_availability_flag = false;
-    // }
-    // int err = bt_le_ext_adv_stop(adv_set);
-    // if (err) {
-    //     LOG_ERR("Failed to stop advertising (err %d)\n", err);
-    //     return err;
-    // }
-
     // LOG_INF("Advertising stopped successfully.");
     advertising_complete_flag = true;
     update_availability_flag = false; // Reset availability after advertising

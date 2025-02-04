@@ -1,8 +1,8 @@
 #ifndef SDCARD_MODULE_H
 #define SDCARD_MODULE_H
 
-#define CSV_TEST_NAME "msg200ci" //sw50n3, msg400n5, sw80n3, msg400
-#define TEST_PERIOD 300 //seconds
+#define CSV_TEST_NAME "msg400n5" //sw50n3, msg400n5, sw80n3, msg400
+#define TEST_PERIOD 60 //seconds
 #define TEST_SHIFT 5 //ms
 
 void set_error_handler(void (*handler)(const char *));
