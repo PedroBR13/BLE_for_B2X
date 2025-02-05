@@ -9,6 +9,7 @@
 #include "beacon_module.h"  // Include the BLE beacon module
 #include "ble_settings.h"
 #include "sdcard_module.h"
+#include "uart_module.h"
 
 LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
 
@@ -22,7 +23,8 @@ typedef enum {
     STATE_ADVERTISING,
     STATE_DONE,
     STATE_NEW_TEST_FILE,
-    STATE_ERROR
+    STATE_ERROR,
+    STATE_UART_SYNC
 } app_state_t;
 
 static app_state_t current_state = STATE_DONE;  // Initialize to GNSS search state
@@ -239,7 +241,7 @@ int main(void) {
                 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                     gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
                     gpio_pin_configure_dt(&led2, GPIO_OUTPUT_INACTIVE);
-                    gpio_pin_configure_dt(&led3, GPIO_OUTPUT_INACTIVE);
+                    gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
                     gpio_pin_configure_dt(&led4, GPIO_OUTPUT_INACTIVE);
                 #endif
 
@@ -249,41 +251,69 @@ int main(void) {
                     LOG_ERR("Bluetooth init failed (err %d)", err);
                     return err;
                 }
-                LOG_INF("Bluetooth initialized");
-
-                err = application_init();
-                if (err) {
-                    LOG_ERR("Application init failed");
-                    return err;
-                }
-
+                
+                
                 // Initialize and start Bluetooth advertising
                 err = advertising_module_init();
                 if (err) {
                     LOG_ERR("Advertising module init failed");
                     return err;
                 }
-
-                switch_recording(true);
-
-
-                #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-                    #if ROLE
-                        k_timer_init(&timeout_timer, timer_handler, NULL);
-                        k_timer_start(&timeout_timer, K_SECONDS(TEST_PERIOD), K_SECONDS(TEST_PERIOD));
-                    #endif
-                    k_timer_init(&led_timer, led_off, NULL);
-        	    #endif
-
-                reset_last_packet_time();
-
-                LOG_INF("Msg generation: %d ms / Number of copies: %d / Scan Window: %d ms / Test: %s / Time shift: %d ms / Role: %d", 
-                INTERVAL, PACKET_COPIES,SCAN_WINDOW_MAIN,CSV_TEST_NAME, TEST_SHIFT,ROLE);
                 
-                current_state = STATE_SCANNING;
+                LOG_INF("Bluetooth initialized");
+                
+                #ifdef CONFIG_BOARD_NRF9160DK_NRF52840
+                    current_state = STATE_SCANNING;
+                #else
+                    current_state = STATE_UART_SYNC;
+                #endif
                 break;
             
             #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+                case STATE_UART_SYNC:
+                    LOG_INF("Start UART sychronization");
+                    err = uart_init();
+                    if (err) {
+                        LOG_ERR("UART init failed");
+                        return err;
+                    }
+
+                    #if ROLE
+                        // **Keep sending "HELLO" until slave responds**
+                        detect_slave();
+                        uart_send("SYNC");
+                    #else
+                        LOG_INF("Searching for master...");
+                        // wait_for_response("HELLO");
+                        wait_for_response("SYNC");
+                    #endif
+
+                    err = application_init();
+                    if (err) {
+                        LOG_ERR("Application init failed");
+                        return err;
+                    }
+
+                    switch_recording(true);
+
+
+                    #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+                        #if ROLE
+                            k_timer_init(&timeout_timer, timer_handler, NULL);
+                            k_timer_start(&timeout_timer, K_SECONDS(TEST_PERIOD), K_SECONDS(TEST_PERIOD));
+                        #endif
+                        k_timer_init(&led_timer, led_off, NULL);
+                        gpio_pin_configure_dt(&led3, GPIO_OUTPUT_INACTIVE);
+                    #endif
+
+                    reset_last_packet_time();
+
+                    LOG_INF("Msg generation: %d ms / Number of copies: %d / Scan Window: %d ms / Test: %s / Time shift: %d ms / Role: %d", 
+                    INTERVAL, PACKET_COPIES,SCAN_WINDOW_MAIN,CSV_TEST_NAME, TEST_SHIFT,ROLE);
+
+                    current_state = STATE_SCANNING;
+                    break;
+
             #if ROLE
                 case STATE_NEW_TEST_FILE:
                     append_null();
