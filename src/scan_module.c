@@ -125,7 +125,7 @@ int ble_start_scanning(void) {
     struct bt_le_scan_param scan_param = {
         .type = BT_HCI_LE_SCAN_PASSIVE,
         .options = BT_LE_SCAN_OPT_NONE,
-        .interval = SCAN_WINDOW,
+        .interval = SCAN_INTERVAL,
         .window = SCAN_WINDOW,
     };
 

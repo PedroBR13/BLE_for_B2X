@@ -13,7 +13,7 @@ static struct rtc_time_s rtc_time = {0,0,0,0,0};
 static struct gnss_s last_gnss_data  = {52243187,6856186};
 
 struct packet_content {
-    uint8_t tx_delay;
+    uint32_t tx_delay;
     uint16_t press_count;
     uint32_t timestamp;
 };
@@ -111,9 +111,9 @@ static void delayed_packet_enqueue(struct k_work *work) {
     }
 
     // Populate new packet content
-    current_packet.tx_delay = k_uptime_get_32();
+    current_packet.tx_delay = k_uptime_get();
     current_packet.press_count = adv_mfg_data.number_press[0] + 1;
-    // LOG_INF("Packet generated");
+    // LOG_INF("Packet generated at: %u", current_packet.tx_delay);
 
     // Simulate network layer delay
     random_delay(11, 20);
@@ -191,12 +191,28 @@ int advertising_start(void) {
     }
     advertising_complete_flag = false;
 
+    struct bt_le_ext_adv_start_param start_param = {
+        .timeout = 0,
+        .num_events = PACKET_COPIES
+    };
+
+    // struct bt_le_adv_param adv_param = {
+    //     .options = BT_LE_ADV_OPT_NONE,
+    //     .interval_min = ADV_INTERVAL,
+    //     .interval_max = ADV_INTERVAL,
+    //     .peer = NULL,
+    // };
+
+
     // Update adv_mfg_data with the current packet content
     adv_mfg_data.number_press[0] = current_packet.press_count;
-    adv_mfg_data.tx_delay[0] = k_uptime_get_32() - current_packet.tx_delay;
     adv_mfg_data.latitude[0] = last_gnss_data.latitude;
     adv_mfg_data.longitude[0] = last_gnss_data.longitude;
     adv_mfg_data.timestamp[0] = get_current_time_packed();
+    adv_mfg_data.tx_delay[0] = k_uptime_get() - current_packet.tx_delay;
+    // uint32_t time =  k_uptime_get();
+    // LOG_INF("Packet value: %u / Transmission time: %u / Saved time: %u", adv_mfg_data.tx_delay[0], time, current_packet.tx_delay);
+    // LOG_INF("Packet filled at: %u", time);
 
     // Debug log to show packet content and its size
     // LOG_INF("Advertising packet content:");
@@ -212,24 +228,14 @@ int advertising_start(void) {
         LOG_ERR("Failed to set advertising data (err %d)\n", err);
         return err;
     }
-    
-    struct bt_le_ext_adv_start_param start_param = {
-        .timeout = 0,
-        .num_events = PACKET_COPIES
-    };
-
-    struct bt_le_adv_param adv_param = {
-        .options = BT_LE_ADV_OPT_NONE,
-        .interval_min = ADV_INTERVAL,
-        .interval_max = ADV_INTERVAL,
-        .peer = NULL,
-    };
 
     err = bt_le_ext_adv_start(adv_set, &start_param);
     if (err) {
         LOG_ERR("Failed to start advertising (err %d)", err);
         return err;
     }
+    // time =  k_uptime_get();
+    // LOG_INF("Packet sent at: %u", time);
 
     return 0;
 }
