@@ -29,7 +29,9 @@ typedef enum {
 
 static app_state_t current_state = STATE_DONE;  // Initialize to GNSS search state
 
+#if ROLE
 static uint8_t test_count = 0;
+#endif
 
 void error_callback(const char *error_message)
 {
@@ -40,20 +42,65 @@ void error_callback(const char *error_message)
 }
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+        #define EXPECTED_PULSE_COUNT 10 
+
         /* The devicetree node identifier for the "led0" alias. */
         #define LED0_NODE DT_ALIAS(led0)
         #define LED1_NODE DT_ALIAS(led1)
         #define LED2_NODE DT_ALIAS(led2)
         #define LED3_NODE DT_ALIAS(led3)
+        #define SYNC_PIN  DT_ALIAS(sync)  // Use D9 (gpio1 11)
 
         static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
         static const struct gpio_dt_spec led2 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
         static const struct gpio_dt_spec led3 = GPIO_DT_SPEC_GET(LED2_NODE, gpios);
         static const struct gpio_dt_spec led4 = GPIO_DT_SPEC_GET(LED3_NODE, gpios);
+        static const struct gpio_dt_spec sync = GPIO_DT_SPEC_GET(SYNC_PIN, gpios);
         
         // Timers
         #if ROLE
             static struct k_timer timeout_timer;
+            void sync_pulse(void) {
+                gpio_pin_toggle_dt(&sync);
+                gpio_pin_toggle_dt(&sync);
+                gpio_pin_toggle_dt(&led3);
+            }
+        #endif
+        #if !ROLE
+            static struct gpio_callback sync_cb_data;
+            static bool synchronized = false;
+            static bool synchronized_done = false;
+            static uint32_t pulse_count = 0; // Track pulse count
+            static uint32_t last_sync_time = 0; // Timestamp of the last sync pulse
+            static uint32_t sync_period = 0; // Time difference between sync pulses
+
+            // Callback function for sync pulse
+            void sync_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
+                uint32_t current_time = k_uptime_get();
+                
+                // LOG_INF("Sync pulse received at %u ms", current_time);
+
+                if (!synchronized) {
+                    // Start synchronization after the first pulse
+                    synchronized = true;
+                    pulse_count = 1;
+                    last_sync_time = current_time;
+                } else {
+                    // Calculate the time difference between consecutive sync pulses
+                    sync_period = current_time - last_sync_time;
+                    last_sync_time = current_time;
+                    pulse_count++;
+
+                    // Log sync period (frequency of sync pulse)
+                    // LOG_INF("Sync period: %u ms", sync_period);
+
+                    // If we've received 10 pulses, stop listening and start toggling the LED
+                    if (pulse_count >= EXPECTED_PULSE_COUNT) {
+                        // LOG_INF("Received 10 pulses. Starting LED toggle.");
+                        gpio_pin_interrupt_configure_dt(&sync, GPIO_INT_DISABLE); // Disable further interrupts
+                    }
+                }
+            }
         #endif
         static struct k_timer led_timer;
 
@@ -106,12 +153,15 @@ int main(void) {
         if (!gpio_is_ready_dt(&led4)) {
             return 0;
         }
+        if (!gpio_is_ready_dt(&sync)) {
+            return 0;
+        }
 
+        gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);   
+        gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);
+        
         #if ROLE
-
-            gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);   
-            gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);
-
+            gpio_pin_configure_dt(&sync, GPIO_OUTPUT);
             // Register the error callback with the SD card module
             set_error_handler(error_callback);
             
@@ -124,10 +174,20 @@ int main(void) {
             } 
 
             append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); 
+        #endif
+        #if !ROLE
+            // Configure sync pin (input with pull-up) and interrupt for rising edge
+            gpio_pin_configure_dt(&sync, GPIO_INPUT | GPIO_PULL_UP);
+            gpio_pin_interrupt_configure_dt(&sync, GPIO_INT_EDGE_TO_ACTIVE);
+
+            // Initialize callback for sync pulse
+            gpio_init_callback(&sync_cb_data, sync_callback, BIT(sync.pin));
+            gpio_add_callback(sync.port, &sync_cb_data);
+        #endif
 
             gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
             gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
-        #endif
+        
     #endif
 
     // err = nrf_modem_lib_init();
@@ -282,21 +342,34 @@ int main(void) {
                         // **Keep sending "HELLO" until slave responds**
                         detect_slave();
                         uart_send("SYNC");
+                        // int i = 0;
+                        // while (i < EXPECTED_PULSE_COUNT) {
+                        //     k_sleep(K_MSEC(200));
+                        //     sync_pulse();
+                        //     i++;
+                        // }
                     #else
                         LOG_INF("Searching for master...");
                         // wait_for_response("HELLO");
                         wait_for_response("SYNC");
+                        // while (!synchronized_done) {
+                        //     if (synchronized && pulse_count >= EXPECTED_PULSE_COUNT) {
+                        //         // After receiving 10 pulses, blink LED at the sync period frequency
+                        //         if (sync_period > 0) {
+                        //             // blink_led();
+                        //             // LOG_INF("Blinking LED at %u ms", sync_period);
+                        //             k_sleep(K_MSEC(sync_period));  // Sleep for the sync period to blink the LED
+                        //             synchronized_done=true;
+                        //         }
+                        //     } else {
+                        //         // If not yet synchronized, just wait
+                        //         k_sleep(K_MSEC(1));  // Sleep to avoid tight loop
+                        //     }
+                        // }
                     #endif
 
-                    err = application_init();
-                    if (err) {
-                        LOG_ERR("Application init failed");
-                        return err;
-                    }
-
                     switch_recording(true);
-
-
+                    
                     #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                         #if ROLE
                             k_timer_init(&timeout_timer, timer_handler, NULL);
@@ -307,6 +380,14 @@ int main(void) {
                     #endif
 
                     reset_last_packet_time();
+
+                    // LOG_INF("App starting...");
+                    err = application_init();
+                    if (err) {
+                        LOG_ERR("Application init failed");
+                        return err;
+                    }
+                    // LOG_INF("App started");
 
                     LOG_INF("Msg generation: %d ms / Number of copies: %d / Scan Window: %d ms / Test: %s / Time shift: %d ms / Role: %d", 
                     INTERVAL, PACKET_COPIES,SCAN_WINDOW_MAIN,CSV_TEST_NAME, TEST_SHIFT,ROLE);

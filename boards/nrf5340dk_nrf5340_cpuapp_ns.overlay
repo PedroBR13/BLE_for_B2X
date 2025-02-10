@@ -1,5 +1,4 @@
 
-
   arduino_spi: &spi4 {
     status = "okay";
     compatible = "nordic,nrf-spim";
@@ -31,6 +30,20 @@
   
   &i2c1 {
     status = "disabled";
+  };
+
+  / {
+    aliases {
+        sync = &sync_gpio;  
+    };
+  
+    sync_out: sync_out {
+        compatible = "gpio-leds";
+        sync_gpio: sync_gpio { 
+            gpios = <&gpio1 11 GPIO_ACTIVE_HIGH>;  // Use D9 (gpio1 11)
+            label = "SYNC_OUT";
+        };
+    };
   };
 
   &pinctrl {

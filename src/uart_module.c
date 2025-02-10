@@ -52,7 +52,7 @@ void wait_for_response(const char *expected) {
     LOG_INF("Waiting for response: %s", expected);
     
     while (1) {
-        k_sleep(K_MSEC(100));  // Small delay to avoid CPU overuse
+        k_sleep(K_MSEC(1));  // Small delay to avoid CPU overuse
         if (strncmp((char *)rx_buf, expected, strlen(expected)) == 0) {
             LOG_INF("Response received: %s", rx_buf);
             memset(rx_buf, 0, sizeof(rx_buf));  // Clear buffer after match
