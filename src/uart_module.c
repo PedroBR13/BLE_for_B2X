@@ -45,7 +45,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 
 void uart_send(const char *msg) {
     uart_tx(uart, (uint8_t *)msg, strlen(msg), SYS_FOREVER_US);
-    LOG_INF("Sent: %s", msg);
+    // LOG_INF("Sent: %s", msg);
 }
 
 void wait_for_response(const char *expected) {
@@ -59,8 +59,6 @@ void wait_for_response(const char *expected) {
             return;  // Exit loop once response is received
         }
     }
-
-    LOG_INF("Steady love");
 }
 
 void detect_slave(void) {
@@ -74,7 +72,7 @@ void detect_slave(void) {
             memset(rx_buf, 0, sizeof(rx_buf));  // Clear buffer
             return;
         }
-        LOG_WRN("No response, retrying...");
+        // LOG_WRN("No response, retrying...");
     }
 
     

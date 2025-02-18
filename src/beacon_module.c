@@ -25,6 +25,9 @@ static uint32_t override_interval = 0;  // 0 means no override
 static struct k_timer packet_gen_timer;
 static struct k_work packet_work;
 
+// static int start_time = 0;
+static bool fix_drift = false;
+
 #ifdef CONFIG_BOARD_NRF9160DK_NRF52840
     #define DEVICE_NAME "B2B2"
 #else
@@ -111,9 +114,24 @@ static void delayed_packet_enqueue(struct k_work *work) {
     }
 
     // Populate new packet content
+    int prev_gen = current_packet.tx_delay;
     current_packet.tx_delay = k_uptime_get();
     current_packet.press_count = adv_mfg_data.number_press[0] + 1;
-    // LOG_INF("Packet generated at: %u", current_packet.tx_delay);
+    int time_diff = current_packet.tx_delay - prev_gen - INTERVAL;
+    // LOG_INF("Packet generating period: %u / cycle ticks: %d / Diff: %d", (current_packet.tx_delay-prev_gen),(k_cycle_get_32() - start_time), time_diff);
+    // start_time = k_cycle_get_32();
+
+    // Check if the time difference is different than your desired interval
+    if (abs(time_diff) > 0 && abs(time_diff) <= 5) {
+        if (!fix_drift) {
+            int fix = INTERVAL - time_diff;
+            // LOG_INF("Adjusting time delay by %d ms, next period %d", time_diff, fix);  // Log the adjustment
+            k_timer_start(&packet_gen_timer, K_MSEC(fix), PACKET_GEN_INTERVAL);
+            fix_drift = true;
+        } else {
+            fix_drift = false;
+        }
+    }
 
     // Simulate network layer delay
     random_delay(11, 20);

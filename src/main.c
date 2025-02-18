@@ -29,6 +29,11 @@ typedef enum {
 
 static app_state_t current_state = STATE_DONE;  // Initialize to GNSS search state
 
+static int time = 0;
+static uint32_t start_time = 0;
+static uint32_t elapsed_cycles = 0;
+static uint32_t target_cycles = 0; 
+
 #if ROLE
 static uint8_t test_count = 0;
 #endif
@@ -44,64 +49,66 @@ void error_callback(const char *error_message)
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
         #define EXPECTED_PULSE_COUNT 10 
 
+        static bool first_test = true;
+
         /* The devicetree node identifier for the "led0" alias. */
         #define LED0_NODE DT_ALIAS(led0)
         #define LED1_NODE DT_ALIAS(led1)
         #define LED2_NODE DT_ALIAS(led2)
         #define LED3_NODE DT_ALIAS(led3)
-        #define SYNC_PIN  DT_ALIAS(sync)  // Use D9 (gpio1 11)
+        // #define SYNC_PIN  DT_ALIAS(sync)  // Use D9 (gpio1 11)
 
         static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
         static const struct gpio_dt_spec led2 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
         static const struct gpio_dt_spec led3 = GPIO_DT_SPEC_GET(LED2_NODE, gpios);
         static const struct gpio_dt_spec led4 = GPIO_DT_SPEC_GET(LED3_NODE, gpios);
-        static const struct gpio_dt_spec sync = GPIO_DT_SPEC_GET(SYNC_PIN, gpios);
+        // static const struct gpio_dt_spec sync = GPIO_DT_SPEC_GET(SYNC_PIN, gpios);
         
         // Timers
         #if ROLE
             static struct k_timer timeout_timer;
-            void sync_pulse(void) {
-                gpio_pin_toggle_dt(&sync);
-                gpio_pin_toggle_dt(&sync);
-                gpio_pin_toggle_dt(&led3);
-            }
+            // void sync_pulse(void) {
+            //     gpio_pin_toggle_dt(&sync);
+            //     gpio_pin_toggle_dt(&sync);
+            //     gpio_pin_toggle_dt(&led3);
+            // }
         #endif
-        #if !ROLE
-            static struct gpio_callback sync_cb_data;
-            static bool synchronized = false;
-            static bool synchronized_done = false;
-            static uint32_t pulse_count = 0; // Track pulse count
-            static uint32_t last_sync_time = 0; // Timestamp of the last sync pulse
-            static uint32_t sync_period = 0; // Time difference between sync pulses
+        // #if !ROLE
+            // static struct gpio_callback sync_cb_data;
+            // static bool synchronized = false;
+            // static bool synchronized_done = false;
+            // static uint32_t pulse_count = 0; // Track pulse count
+            // static uint32_t last_sync_time = 0; // Timestamp of the last sync pulse
+            // static uint32_t sync_period = 0; // Time difference between sync pulses
 
             // Callback function for sync pulse
-            void sync_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
-                uint32_t current_time = k_uptime_get();
+            // void sync_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
+            //     uint32_t current_time = k_uptime_get();
                 
-                // LOG_INF("Sync pulse received at %u ms", current_time);
+            //     // LOG_INF("Sync pulse received at %u ms", current_time);
 
-                if (!synchronized) {
-                    // Start synchronization after the first pulse
-                    synchronized = true;
-                    pulse_count = 1;
-                    last_sync_time = current_time;
-                } else {
-                    // Calculate the time difference between consecutive sync pulses
-                    sync_period = current_time - last_sync_time;
-                    last_sync_time = current_time;
-                    pulse_count++;
+            //     if (!synchronized) {
+            //         // Start synchronization after the first pulse
+            //         synchronized = true;
+            //         pulse_count = 1;
+            //         last_sync_time = current_time;
+            //     } else {
+            //         // Calculate the time difference between consecutive sync pulses
+            //         sync_period = current_time - last_sync_time;
+            //         last_sync_time = current_time;
+            //         pulse_count++;
 
-                    // Log sync period (frequency of sync pulse)
-                    // LOG_INF("Sync period: %u ms", sync_period);
+            //         // Log sync period (frequency of sync pulse)
+            //         // LOG_INF("Sync period: %u ms", sync_period);
 
-                    // If we've received 10 pulses, stop listening and start toggling the LED
-                    if (pulse_count >= EXPECTED_PULSE_COUNT) {
-                        // LOG_INF("Received 10 pulses. Starting LED toggle.");
-                        gpio_pin_interrupt_configure_dt(&sync, GPIO_INT_DISABLE); // Disable further interrupts
-                    }
-                }
-            }
-        #endif
+            //         // If we've received 10 pulses, stop listening and start toggling the LED
+            //         if (pulse_count >= EXPECTED_PULSE_COUNT) {
+            //             // LOG_INF("Received 10 pulses. Starting LED toggle.");
+            //             gpio_pin_interrupt_configure_dt(&sync, GPIO_INT_DISABLE); // Disable further interrupts
+            //         }
+            //     }
+            // }
+        // #endif
         static struct k_timer led_timer;
 
         // Function to turn off the LED
@@ -153,15 +160,15 @@ int main(void) {
         if (!gpio_is_ready_dt(&led4)) {
             return 0;
         }
-        if (!gpio_is_ready_dt(&sync)) {
-            return 0;
-        }
+        // if (!gpio_is_ready_dt(&sync)) {
+        //     return 0;
+        // }
 
         gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);   
         gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);
         
         #if ROLE
-            gpio_pin_configure_dt(&sync, GPIO_OUTPUT);
+            // gpio_pin_configure_dt(&sync, GPIO_OUTPUT);
             // Register the error callback with the SD card module
             set_error_handler(error_callback);
             
@@ -175,15 +182,15 @@ int main(void) {
 
             append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); 
         #endif
-        #if !ROLE
-            // Configure sync pin (input with pull-up) and interrupt for rising edge
-            gpio_pin_configure_dt(&sync, GPIO_INPUT | GPIO_PULL_UP);
-            gpio_pin_interrupt_configure_dt(&sync, GPIO_INT_EDGE_TO_ACTIVE);
+        // #if !ROLE
+        //     // Configure sync pin (input with pull-up) and interrupt for rising edge
+        //     gpio_pin_configure_dt(&sync, GPIO_INPUT | GPIO_PULL_UP);
+        //     gpio_pin_interrupt_configure_dt(&sync, GPIO_INT_EDGE_TO_ACTIVE);
 
-            // Initialize callback for sync pulse
-            gpio_init_callback(&sync_cb_data, sync_callback, BIT(sync.pin));
-            gpio_add_callback(sync.port, &sync_cb_data);
-        #endif
+        //     // Initialize callback for sync pulse
+        //     gpio_init_callback(&sync_cb_data, sync_callback, BIT(sync.pin));
+        //     gpio_add_callback(sync.port, &sync_cb_data);
+        // #endif
 
             gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
             gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
@@ -211,6 +218,10 @@ int main(void) {
 
             case STATE_SCANNING:
                 // Initialize and start Bluetooth scanning
+                // time = k_uptime_get();
+                // start_time = k_cycle_get_32(); // Get CPU cycle count
+                // int scan_duration = 0;
+                // LOG_INF("Starting scan: %d", k_uptime_get());
                 reset_packet_received();
                 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                     ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
@@ -224,12 +235,9 @@ int main(void) {
                     LOG_ERR("BLE scanning start failed");
                     return err;
                 }
-
-                // LOG_INF("Start scan");
-
-                // Simulate scanning duration
+                
                 k_sleep(K_MSEC(SCAN_WINDOW_MAIN));
-
+                // scan_duration = scan_duration + SCAN_WINDOW_MAIN;
                 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                     if (is_packet_received()) {
                         reset_led_timer();
@@ -240,29 +248,57 @@ int main(void) {
                 while (!check_update_availability()) {
                     // LOG_INF("Scan interval reset due to no data to send. \n");
                     k_sleep(K_MSEC(SCAN_WINDOW_MAIN));
+                    // scan_duration = scan_duration + SCAN_WINDOW_MAIN;
                     #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                         if (is_packet_received()) {
                             reset_led_timer();
                         }
                     #endif
                 }
+                // LOG_INF("Active scan: %d", k_uptime_get()-time1);
 
-                err = bt_le_scan_stop();
+                // LOG_INF("Stoppping scan: %d", k_uptime_get());
+                // int time2 = k_uptime_get();
+                // err = bt_le_scan_stop();
+                // if (err) {
+                //     LOG_ERR("Stopping scanning failed (err %d)\n", err);
+                //     return 0;
+                // }
+                // start_time = k_cycle_get_32(); // Get CPU cycle count
+
+                int err = bt_le_scan_stop();
                 if (err) {
                     LOG_ERR("Stopping scanning failed (err %d)\n", err);
                     return 0;
                 }
 
-                // LOG_INF("Scan stopped");
+                // elapsed_cycles = k_cycle_get_32() - start_time;
+                // target_cycles = k_ms_to_cyc_ceil32(3); // Convert 1 ms to CPU cycles
+
+                // if (elapsed_cycles < target_cycles) {
+                //     k_busy_wait(((target_cycles - elapsed_cycles) * 1000000) / sys_clock_hw_cycles_per_sec());
+                // }
+
+                // LOG_INF("Scan stop duration: %d", k_uptime_get()-time2);
+
                 // Move to ADVERTISING state
                 if (current_state != STATE_NEW_TEST_FILE){
                     current_state = STATE_ADVERTISING;
                 }
-                    
+
+                // elapsed_cycles = k_cycle_get_32() - start_time - k_ms_to_cyc_ceil32(scan_duration-5);
+                // target_cycles = k_ms_to_cyc_ceil32(5); // Convert 1 ms to CPU cycles
+
+                // if (elapsed_cycles < target_cycles) {
+                //     k_busy_wait(((target_cycles - elapsed_cycles) * 1000000) / sys_clock_hw_cycles_per_sec());
+                // }
+
+                // LOG_INF("Scan duration: %d", k_uptime_get()-time);  
                 break;
 
             case STATE_ADVERTISING:
-                // LOG_INF("Start beacon");
+                // LOG_INF("Starting beacon: %d", k_uptime_get());
+                // time = k_uptime_get();
                 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                     ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);
                     if (ret < 0) {
@@ -283,9 +319,11 @@ int main(void) {
                     #endif
                 }
 
+                // LOG_INF("Beacon start duration: %d", k_uptime_get()-time);
+
                 // Wait here until advertising completes
                 while (!get_adv_progress()) {
-                    k_sleep(K_MSEC(10)); // Small delay to avoid CPU overuse
+                    k_sleep(K_MSEC(1)); // Small delay to avoid CPU overuse
                     // LOG_INF("transmission not done");
                 }
 
@@ -294,6 +332,7 @@ int main(void) {
                 if (current_state != STATE_NEW_TEST_FILE){
                     current_state = STATE_SCANNING;
                 }
+                // LOG_INF("Advertising duration: %d", k_uptime_get()-time);   
                 break;
 
             case STATE_DONE:
@@ -373,7 +412,7 @@ int main(void) {
                     #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                         #if ROLE
                             k_timer_init(&timeout_timer, timer_handler, NULL);
-                            k_timer_start(&timeout_timer, K_SECONDS(TEST_PERIOD), K_SECONDS(TEST_PERIOD));
+                            k_timer_start(&timeout_timer, K_SECONDS(RUNAWAY_PERIOD), K_SECONDS(TEST_PERIOD));
                         #endif
                         k_timer_init(&led_timer, led_off, NULL);
                         gpio_pin_configure_dt(&led3, GPIO_OUTPUT_INACTIVE);
@@ -407,8 +446,14 @@ int main(void) {
                     // }
 
                     switch_recording(false);
-                    trigger_time_shift();
-                    // LOG_INF("Time shift added");
+                    if (first_test) {
+                        first_test = false;
+                    } else {
+                        trigger_time_shift();
+                        LOG_INF("Time shift added at: %lld", k_uptime_get());
+                    }
+                    
+                    
                     
                     // k_sleep(K_MSEC(TEST_SHIFT));
                     switch_recording(true);

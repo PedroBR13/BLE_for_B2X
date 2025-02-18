@@ -240,10 +240,10 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
                     if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
                         LOG_ERR("Message queue full. Dropping packet.");
                     }
-
-                    // Mark that a packet was received
-                    packet_received = true;
                 #endif
+
+                // Mark that a packet was received
+                packet_received = true;
             #endif
 
             } else {
