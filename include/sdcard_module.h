@@ -1,10 +1,11 @@
 #ifndef SDCARD_MODULE_H
 #define SDCARD_MODULE_H
 
-#define CSV_TEST_NAME "sw50si80" //sw50n3, sw50n5, sw80n3, sw50si80
+#define CSV_TEST_NAME "test" //sw50n3, sw50n5, sw80n3, sw50si80
 #define TEST_PERIOD 60 //seconds
 #define TEST_SHIFT 10 //ms
-#define RUNAWAY_PERIOD 60 //seconds. Time to separate the boards after sync 
+#define RUNAWAY_PERIOD 120 //seconds. Time to separate the boards after sync
+#define NLOS_TEST 1 // 0 = LOS, 1 = NLOS
 
 void set_error_handler(void (*handler)(const char *));
 int sdcard_init(void);

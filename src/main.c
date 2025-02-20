@@ -83,11 +83,18 @@ void error_callback(const char *error_message)
             k_timer_start(&led_timer, K_MSEC(100), K_NO_WAIT);  // Reset the timer (1 second)
         }
 
+        #define DEBOUNCE_DELAY_MS 500
+        static uint32_t last_press_time = 0;
+
         void button_pressed(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
         {
-            gpio_pin_toggle_dt(&led4);
-            // gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
-            LOG_INF("Button pressed");
+            uint32_t current_time = k_uptime_get();
+
+            if ((current_time - last_press_time) > DEBOUNCE_DELAY_MS) {
+                last_press_time = current_time;
+                gpio_pin_toggle_dt(&led4);
+                LOG_INF("Button pressed");
+            }
         }
 
     #if ROLE
@@ -130,6 +137,11 @@ int main(void) {
         }
         if (!gpio_is_ready_dt(&button)) {
             return 0;
+        }
+
+        ret = gpio_pin_configure_dt(&button, GPIO_INPUT);
+        if (ret < 0) {
+            return -1;
         }
         
         ret = gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);

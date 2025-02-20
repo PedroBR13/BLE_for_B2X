@@ -32,19 +32,15 @@
     status = "disabled";
   };
 
-//   / {
-//   aliases {
-//       sync = &sync_gpio;  
-//   };
-
-//   sync_out: sync_out {
-//       compatible = "gpio-leds";
-//       sync_gpio: sync_gpio { 
-//           gpios = <&gpio1 11 GPIO_ACTIVE_HIGH>;  // Use D9 (gpio1 11)
-//           label = "SYNC_OUT";
-//       };
-//   };
-// };
+  / {
+    leds {
+      compatible = "gpio-leds";
+      led3: led_3 {
+        gpios = <&gpio0 31 GPIO_ACTIVE_HIGH>;
+        label = "Green LED 3";
+      };
+    };
+  };
 
   &pinctrl {
     uart2_default: uart2_default {
