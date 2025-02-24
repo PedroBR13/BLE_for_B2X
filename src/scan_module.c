@@ -29,9 +29,9 @@ static struct packet_data null_pkt = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static struct packet_data error_pkt = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-    #if ROLE
+    // #if ROLE
         K_MSGQ_DEFINE(packet_msgq, sizeof(struct packet_data), 10, 4);
-    #endif
+    // #endif
 #endif
 
 static bool packet_received = false;
@@ -141,36 +141,40 @@ int ble_start_scanning(void) {
 
 // Bluetooth scan callback
 void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf_simple *ad) {
-    if (sd_record == true) {
-        char addr_str[BT_ADDR_LE_STR_LEN];
-        bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
-        struct packet_data pkt;
+    
+    char addr_str[BT_ADDR_LE_STR_LEN];
+    bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
+    struct packet_data pkt;
 
-        // Get the current time as a string
-        uint32_t current_time = get_current_time_packed();
-        uint32_t uptime = k_uptime_get();
+    // Get the current time as a string
+    uint32_t current_time = get_current_time_packed();
+    uint32_t uptime = k_uptime_get();
 
-        // Parse the advertisement data
-        uint16_t *data = ad->data;
-        int len = ad->len;
-        char *name = NULL;
-        const uint16_t *manufacturer_data = NULL;
-        int manufacturer_data_len = 0;
+    // Parse the advertisement data
+    // uint16_t *data = ad->data;
+    // int len = ad->len;
+    char *name = NULL;
+    const uint16_t *manufacturer_data = NULL;
+    int manufacturer_data_len = 0;
 
-        parse_advertisement_data(ad->data, ad->len, &name, &manufacturer_data, &manufacturer_data_len);
+    parse_advertisement_data(ad->data, ad->len, &name, &manufacturer_data, &manufacturer_data_len);
 
-        // LOG_INF("Device found: %s (RSSI %d), type %u, AD data len %u, device name: %s\n",
-        //     addr_str, rssi, type, ad->len, name ? name : "(unknown)");
+    // LOG_INF("Device found: %s (RSSI %d), type %u, AD data len %u, device name: %s\n",
+    //     addr_str, rssi, type, ad->len, name ? name : "(unknown)");
 
-        #ifdef CONFIG_BOARD_NRF9160DK_NRF52840
+    #ifdef CONFIG_BOARD_NRF9160DK_NRF52840
         if (name && strcmp(name, "B2B1") == 0) {
+    #else
+        #if ROLE
+            if (name && strcmp(name, "B2B2") == 0) {
         #else
-            #if ROLE
-                if (name && strcmp(name, "B2B2") == 0) {
-            #else
-                if (name && strcmp(name, "B2B1") == 0) {
-            #endif
+            if (name && strcmp(name, "B2B1") == 0) {
         #endif
+    #endif
+        // Mark that a packet was received
+        packet_received = true;
+
+        if (sd_record == true) {
             // LOG_INF("Device found: %s (RSSI %d), type %u, AD data len %u, device name: %s\n",
             //                 addr_str, rssi, type, ad->len,name);
 
@@ -236,14 +240,11 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
             pkt.aoi = duration_since_last_packet;
             
             #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-                #if ROLE
+                // #if ROLE
                     if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
                         LOG_ERR("Message queue full. Dropping packet.");
                     }
-                #endif
-
-                // Mark that a packet was received
-                packet_received = true;
+                // #endif
             #endif
 
             } else {
@@ -260,7 +261,7 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
 }
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-    #if ROLE
+    // #if ROLE
         void append_null(void) {
             struct packet_data pkt;
             pkt = null_pkt;
@@ -298,5 +299,5 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
             k_msgq_purge(&packet_msgq); // Clears all pending messages in the queue
             LOG_INF("Packet message queue has been reset.");
         }
-    #endif
+    // #endif
 #endif

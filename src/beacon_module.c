@@ -201,7 +201,7 @@ int advertising_module_init(void) {
     return 0;
 }
 
-int advertising_start(void) {
+int advertising_start(bool null_packet) {
     if (!packet_pending) {
         LOG_WRN("No packet available to advertise. Back to scanning mode.");
         advertising_complete_flag = true;
@@ -223,11 +223,36 @@ int advertising_start(void) {
 
 
     // Update adv_mfg_data with the current packet content
-    adv_mfg_data.number_press[0] = current_packet.press_count;
-    adv_mfg_data.latitude[0] = last_gnss_data.latitude;
-    adv_mfg_data.longitude[0] = last_gnss_data.longitude;
-    adv_mfg_data.timestamp[0] = get_current_time_packed();
-    adv_mfg_data.tx_delay[0] = k_uptime_get() - current_packet.tx_delay;
+    #if NLOS_TEST
+        #if ROLE
+            if (null_packet) {
+                adv_mfg_data.number_press[0] = 0;
+                adv_mfg_data.latitude[0] = 0;
+                adv_mfg_data.longitude[0] = 0;
+                adv_mfg_data.timestamp[0] = 0;
+                adv_mfg_data.tx_delay[0] = 0;
+            } else {
+                adv_mfg_data.number_press[0] = current_packet.press_count;
+                adv_mfg_data.latitude[0] = last_gnss_data.latitude;
+                adv_mfg_data.longitude[0] = last_gnss_data.longitude;
+                adv_mfg_data.timestamp[0] = get_current_time_packed();
+                adv_mfg_data.tx_delay[0] = k_uptime_get() - current_packet.tx_delay;
+            }
+        #else
+            adv_mfg_data.number_press[0] = current_packet.press_count;
+            adv_mfg_data.latitude[0] = last_gnss_data.latitude;
+            adv_mfg_data.longitude[0] = last_gnss_data.longitude;
+            adv_mfg_data.timestamp[0] = get_current_time_packed();
+            adv_mfg_data.tx_delay[0] = k_uptime_get() - current_packet.tx_delay;
+        #endif
+    #else
+        adv_mfg_data.number_press[0] = current_packet.press_count;
+        adv_mfg_data.latitude[0] = last_gnss_data.latitude;
+        adv_mfg_data.longitude[0] = last_gnss_data.longitude;
+        adv_mfg_data.timestamp[0] = get_current_time_packed();
+        adv_mfg_data.tx_delay[0] = k_uptime_get() - current_packet.tx_delay;
+    #endif        
+
     // uint32_t time =  k_uptime_get();
     // LOG_INF("Packet value: %u / Transmission time: %u / Saved time: %u", adv_mfg_data.tx_delay[0], time, current_packet.tx_delay);
     // LOG_INF("Packet filled at: %u", time);

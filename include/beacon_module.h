@@ -7,7 +7,7 @@
 #include <zephyr/bluetooth/gap.h>
 
 int advertising_module_init(void);
-int advertising_start(void);
+int advertising_start(bool null_packet);
 int application_init(void);
 int application_stop(void);
 bool get_adv_progress(void);

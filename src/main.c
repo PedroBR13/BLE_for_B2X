@@ -47,9 +47,6 @@ void error_callback(const char *error_message)
 }
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-        #define EXPECTED_PULSE_COUNT 10 
-
-        static bool first_test = true;
 
         /* The devicetree node identifier for the "led0" alias. */
         #define LED0_NODE DT_ALIAS(led0)
@@ -83,6 +80,12 @@ void error_callback(const char *error_message)
             k_timer_start(&led_timer, K_MSEC(100), K_NO_WAIT);  // Reset the timer (1 second)
         }
 
+        #if ROLE
+            static bool first_test = true;
+        #endif
+
+        static bool recording_status = false;
+
         #define DEBOUNCE_DELAY_MS 500
         static uint32_t last_press_time = 0;
 
@@ -92,8 +95,25 @@ void error_callback(const char *error_message)
 
             if ((current_time - last_press_time) > DEBOUNCE_DELAY_MS) {
                 last_press_time = current_time;
-                gpio_pin_toggle_dt(&led4);
-                LOG_INF("Button pressed");
+                #if NLOS_TEST
+                    // #if ROLE
+                    if (recording_status) {
+                        LOG_INF("Stop recording");
+                        switch_recording(false);
+                        gpio_pin_configure_dt(&led2, GPIO_OUTPUT_INACTIVE);
+                        recording_status = false;
+                    } else {
+                        append_null();
+                        LOG_INF("Start recording");
+                        switch_recording(true);
+                        gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);
+                        recording_status = true;
+                    }
+                    // #else
+                    //     gpio_pin_toggle_dt(&led2);
+                    //     LOG_INF("Button pressed");
+                    // #endif
+                #endif
             }
         }
 
@@ -143,16 +163,11 @@ int main(void) {
         if (ret < 0) {
             return -1;
         }
-        
-        ret = gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
-
-        gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin)); 	
-        gpio_add_callback(button.port, &button_cb_data);
 
         gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);   
         gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);
         
-        #if ROLE
+        #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
             // Register the error callback with the SD card module
             set_error_handler(error_callback);
             
@@ -279,9 +294,25 @@ int main(void) {
                     if (ret < 0) {
                         return 0;
                     }
-                #endif
+                    ret = gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
 
-                err = advertising_start();
+                    gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin)); 	
+                    gpio_add_callback(button.port, &button_cb_data);
+                #endif
+                
+                #if NLOS_TEST
+                    #if ROLE
+                        if(recording_status) {
+                            err = advertising_start(false);
+                        } else {
+                            err = advertising_start(true);
+                        }
+                    #else
+                        err = advertising_start(false); 
+                    #endif
+                #else
+                    err = advertising_start(false);
+                #endif
                 if (err) {
                     LOG_ERR("Advertising start failed");
                     #ifdef CONFIG_BOARD_NRF9160DK_NRF52840
@@ -360,14 +391,16 @@ int main(void) {
                         LOG_INF("Searching for master...");
                         wait_for_response("SYNC");
                     #endif
-
-                    switch_recording(true);
+                    
+                    #if NLOS_TEST
+                        switch_recording(false);
+                    #else 
+                        switch_recording(true);
+                    #endif
                     
                     #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                         #if ROLE
                             #if !(NLOS_TEST)
-
-                            // #else
                                 k_timer_init(&timeout_timer, timer_handler, NULL);
                                 k_timer_start(&timeout_timer, K_SECONDS(RUNAWAY_PERIOD), K_SECONDS(TEST_PERIOD));
                             #endif
