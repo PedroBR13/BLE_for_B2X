@@ -99,11 +99,12 @@ void error_callback(const char *error_message)
                     // #if ROLE
                     if (recording_status) {
                         LOG_INF("Stop recording");
+                        append_stop();
                         switch_recording(false);
                         gpio_pin_configure_dt(&led2, GPIO_OUTPUT_INACTIVE);
                         recording_status = false;
                     } else {
-                        append_null();
+                        // append_null();
                         LOG_INF("Start recording");
                         switch_recording(true);
                         gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);

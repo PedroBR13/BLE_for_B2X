@@ -280,6 +280,26 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
 
         }
 
+        void append_stop(void) {
+            struct packet_data pkt;
+            pkt = null_pkt;
+            uint32_t current_time = get_current_time_packed();
+
+            uint8_t current_hour = (current_time >> 27) & 0x1F;
+            uint8_t current_minute = (current_time >> 21) & 0x3F;
+            uint8_t current_second = (current_time >> 15) & 0x3F;
+            uint16_t current_ms = current_time & 0x3FF;
+
+            pkt.rx_hour = current_hour;
+            pkt.rx_minute = current_minute;
+            pkt.rx_second = current_second;
+            pkt.rx_ms = current_ms;
+            if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
+                        LOG_ERR("Message queue full. Dropping packet.");
+                    }
+
+        }
+
         void sdcard_thread(void) {
             struct packet_data pkt;
             while (true) {

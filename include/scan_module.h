@@ -17,6 +17,7 @@ void reset_packet_queue(void);
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
 void append_null(void);
 void append_error(void);
+void append_stop(void);
 #endif
 
 // Callback for Bluetooth scan results
