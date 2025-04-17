@@ -4,6 +4,7 @@
 #include "beacon_module.h"
 #include "gnss_module.h"
 #include "sdcard_module.h"
+#include <zephyr/drivers/gpio.h>
 
 LOG_MODULE_REGISTER(beacon_module, LOG_LEVEL_INF);
 
@@ -17,6 +18,9 @@ struct packet_content {
     uint16_t press_count;
     uint32_t timestamp;
 };
+
+#define LED3_NODE DT_ALIAS(led3)
+static const struct gpio_dt_spec led4 = GPIO_DT_SPEC_GET(LED3_NODE, gpios);
 
 static struct packet_content current_packet; // Single-packet buffer
 static bool packet_pending = false; // Indicates if a packet is waiting to be served
@@ -118,6 +122,8 @@ static void delayed_packet_enqueue(struct k_work *work) {
     current_packet.tx_delay = k_uptime_get();
     current_packet.press_count = adv_mfg_data.number_press[0] + 1;
     int time_diff = current_packet.tx_delay - prev_gen - INTERVAL;
+    // gpio_pin_configure_dt(&led4, GPIO_OUTPUT_INACTIVE);
+    // gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
     // LOG_INF("Packet generating period: %u / cycle ticks: %d / Diff: %d", (current_packet.tx_delay-prev_gen),(k_cycle_get_32() - start_time), time_diff);
     // start_time = k_cycle_get_32();
 

@@ -7,7 +7,7 @@
 #define INTERVAL 200
 #define PACKET_GEN_INTERVAL K_MSEC(INTERVAL)  // Frequency X in seconds
 #define ADV_INTERVAL 32 // 20ms
-#define ROLE 0 // 1=master , 0=slave
+#define ROLE 1 // 1=master , 0=slave
 
 // SCAN PARAMERTERS
 #define SCAN_INTERVAL 80 // 80 = 50ms, 128 = 80 ms

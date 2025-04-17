@@ -168,20 +168,20 @@ int main(void) {
         gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);   
         gpio_pin_configure_dt(&led2, GPIO_OUTPUT_ACTIVE);
         
-        #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-            // Register the error callback with the SD card module
-            set_error_handler(error_callback);
+        // #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+        //     // Register the error callback with the SD card module
+        //     set_error_handler(error_callback);
             
-            err = sdcard_init();
-            if (err) {
-                LOG_ERR("Failed to initialize SD Card, error: %d", err);
-                return 0;
-            } else {
-                create_csv();
-            } 
+        //     err = sdcard_init();
+        //     if (err) {
+        //         LOG_ERR("Failed to initialize SD Card, error: %d", err);
+        //         return 0;
+        //     } else {
+        //         create_csv();
+        //     } 
 
-            append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); 
-        #endif
+        //     append_csv(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); 
+        // #endif
 
             gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
             gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
@@ -215,10 +215,10 @@ int main(void) {
                 // LOG_INF("Starting scan: %d", k_uptime_get());
                 reset_packet_received();
                 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-                    ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
-                    if (ret < 0) {
-                        return 0;
-                    }
+                    // ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
+                    // if (ret < 0) {
+                    //     return 0;
+                    // }
                 #endif
 
                 err = ble_start_scanning();
@@ -291,14 +291,14 @@ int main(void) {
                 // LOG_INF("Starting beacon: %d", k_uptime_get());
                 // time = k_uptime_get();
                 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-                    ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);
-                    if (ret < 0) {
-                        return 0;
-                    }
-                    ret = gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
+                    // ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);
+                    // if (ret < 0) {
+                    //     return 0;
+                    // }
+                    // ret = gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
 
-                    gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin)); 	
-                    gpio_add_callback(button.port, &button_cb_data);
+                    // gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin)); 	
+                    // gpio_add_callback(button.port, &button_cb_data);
                 #endif
                 
                 #if NLOS_TEST
@@ -348,7 +348,7 @@ int main(void) {
                     gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
                     gpio_pin_configure_dt(&led2, GPIO_OUTPUT_INACTIVE);
                     gpio_pin_configure_dt(&led3, GPIO_OUTPUT_ACTIVE);
-                    gpio_pin_configure_dt(&led4, GPIO_OUTPUT_INACTIVE);
+                    gpio_pin_configure_dt(&led4, GPIO_OUTPUT_ACTIVE);
                 #endif
 
                 // Enable BLE 
@@ -378,26 +378,26 @@ int main(void) {
             #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                 case STATE_UART_SYNC:
                     LOG_INF("Start UART sychronization");
-                    err = uart_init();
-                    if (err) {
-                        LOG_ERR("UART init failed");
-                        return err;
-                    }
+                    // err = uart_init();
+                    // if (err) {
+                    //     LOG_ERR("UART init failed");
+                    //     return err;
+                    // }
 
-                    #if ROLE
-                        // **Keep sending "HELLO" until slave responds**
-                        detect_slave();
-                        uart_send("SYNC");
-                    #else
-                        LOG_INF("Searching for master...");
-                        wait_for_response("SYNC");
-                    #endif
+                    // #if ROLE
+                    //     // **Keep sending "HELLO" until slave responds**
+                    //     detect_slave();
+                    //     uart_send("SYNC");
+                    // #else
+                    //     LOG_INF("Searching for master...");
+                    //     wait_for_response("SYNC");
+                    // #endif
                     
-                    #if NLOS_TEST
-                        switch_recording(false);
-                    #else 
-                        switch_recording(true);
-                    #endif
+                    // #if NLOS_TEST
+                    //     switch_recording(false);
+                    // #else 
+                    //     switch_recording(true);
+                    // #endif
                     
                     #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                         #if ROLE
