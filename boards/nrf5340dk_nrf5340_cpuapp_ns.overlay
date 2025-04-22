@@ -42,6 +42,20 @@
     };
   };
 
+  / {
+    aliases {
+        sync = &sync_gpio;  
+    };
+  
+    sync_out: sync_out {
+        compatible = "gpio-leds";
+        sync_gpio: sync_gpio { 
+            gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;  
+            label = "SYNC_OUT";
+        };
+    };
+  };
+
   &pinctrl {
     uart2_default: uart2_default {
       group1 {
