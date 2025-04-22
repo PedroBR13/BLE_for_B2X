@@ -1,6 +1,6 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
-#include <stdlib.h>
+// #include <stdlib.h>
 #include "scan_module.h"
 #include "gnss_module.h"
 #include "ble_settings.h"
@@ -34,6 +34,8 @@ static struct packet_data error_pkt = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
     // #endif
 #endif
 
+#define MAX_NAME_LEN 32
+
 static bool packet_received = false;
 
 static bool sd_record = false;
@@ -51,23 +53,43 @@ void switch_recording(bool state) {
     sd_record = state;
 }
 
-static void parse_advertisement_data(const uint8_t *data, int len, char **name, const uint8_t **manufacturer_data, int *manufacturer_data_len) {
+static void parse_advertisement_data(const uint8_t *data, int len, char *name_buf, size_t name_buf_size, const uint8_t **manufacturer_data, int *manufacturer_data_len) {
+     // Ensure the output pointers are initialized
+     if (name_buf_size > 0) {
+        name_buf[0] = '\0';  // Initialize to empty string
+    }
+    *manufacturer_data = NULL;
+    *manufacturer_data_len = 0;
+    
     while (len > 0) {
         uint8_t field_len = data[0];
-        if (field_len == 0) {
+        if (field_len == 0 || field_len > len - 1) {
             break;
         }
+        
         uint8_t field_type = data[1];
         const uint8_t *field_data = data + 2;
         int field_data_len = field_len - 1;
 
-        if (field_type == BT_DATA_NAME_COMPLETE) {  // Complete Local Name
-            *name = (char *)malloc(field_data_len + 1);
-            memcpy(*name, field_data, field_data_len);
-            (*name)[field_data_len] = '\0';  // Null-terminate the string
+        // if (field_type == BT_DATA_NAME_COMPLETE && *name == NULL) {  // Complete Local Name
+            // *name = (char *)malloc(field_data_len + 1);
+            // if (*name != NULL) {
+            //     memcpy(device_name_buffer, field_data, field_data_len);
+            //     (*name)[field_data_len] = '\0';
+            // } else {
+            //     LOG_ERR("Failed to allocate memory for device name");
+            // }
+
+            // memcpy(*name, field_data, field_data_len);
+            // (*name)[field_data_len] = '\0';  // Null-terminate the string
+        // }
+        if (field_type == BT_DATA_NAME_COMPLETE && name_buf_size > 0 && name_buf[0] == '\0') {
+            size_t copy_len = field_data_len < name_buf_size - 1 ? field_data_len : name_buf_size - 1;
+            memcpy(name_buf, field_data, copy_len);
+            name_buf[copy_len] = '\0';
         }
 
-        if (field_type == BT_DATA_MANUFACTURER_DATA) {  // Manufacturer Specific Data
+        if (field_type == BT_DATA_MANUFACTURER_DATA && *manufacturer_data == NULL) {  // Manufacturer Specific Data
             *manufacturer_data = field_data;
             *manufacturer_data_len = field_data_len;
         }
@@ -153,14 +175,18 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
     // Parse the advertisement data
     // uint16_t *data = ad->data;
     // int len = ad->len;
-    char *name = NULL;
+    // char *name = NULL;
+    char name_buf[32];  // Adjust size as needed
     const uint16_t *manufacturer_data = NULL;
     int manufacturer_data_len = 0;
 
-    parse_advertisement_data(ad->data, ad->len, &name, &manufacturer_data, &manufacturer_data_len);
+    parse_advertisement_data(ad->data, ad->len, name_buf, sizeof(name_buf), &manufacturer_data, &manufacturer_data_len);
 
     // LOG_INF("Device found: %s (RSSI %d), type %u, AD data len %u, device name: %s\n",
     //     addr_str, rssi, type, ad->len, name ? name : "(unknown)");
+
+    // Choose the name string to compare
+    const char *name = name_buf[0] ? name_buf : NULL;
 
     #ifdef CONFIG_BOARD_NRF9160DK_NRF52840
         if (name && strcmp(name, "B2B1") == 0) {
@@ -179,73 +205,76 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
             //                 addr_str, rssi, type, ad->len,name);
 
             if (manufacturer_data && manufacturer_data_len >= sizeof(adv_mfg_data_type)) {
-            adv_mfg_data_type *data = (adv_mfg_data_type *)manufacturer_data;
+                // adv_mfg_data_type *data = (adv_mfg_data_type *)manufacturer_data;
 
-            // Calculate the duration since the last packet
-            uint32_t duration_since_last_packet = 0;
-            
-            if (last_packet_time != 0) {
-                if (uptime >= last_packet_time) {
-                    duration_since_last_packet = uptime - last_packet_time;
-                } else {
-                    // Handle wrap-around case for a 32-bit timestamp
-                    duration_since_last_packet = (UINT32_MAX - last_packet_time) + uptime + 1;
-                }
-            }
-            last_packet_time = uptime; // Update the last packet time
+                adv_mfg_data_type data;
+                memcpy(&data, manufacturer_data, sizeof(adv_mfg_data_type));
 
-            uint16_t number_press = data->number_press[0];
-            uint16_t tx_delay = data->tx_delay[0];
-            uint32_t longitude = data->longitude[0];
-            uint32_t tx_timestamp = data->timestamp[0];
-
-            // Raw byte values for latitude
-            uint32_t raw_latitude[4];
-            memcpy(raw_latitude, &data->latitude[0], sizeof(raw_latitude));
-
-            // Print raw byte values of latitude
-            // LOG_INF("Raw Latitude Bytes: 0x%02X 0x%02X 0x%02X 0x%02X", raw_latitude[0], raw_latitude[1], raw_latitude[2], raw_latitude[3]);
-
-            // Convert raw bytes to uint32_t
-            uint32_t latitude = data->latitude[0];
-
-            uint8_t current_hour = (current_time >> 27) & 0x1F;
-            uint8_t current_minute = (current_time >> 21) & 0x3F;
-            uint8_t current_second = (current_time >> 15) & 0x3F;
-            uint16_t current_ms = current_time & 0x3FF;
-
-            uint8_t timestamp_hour = (tx_timestamp >> 27) & 0x1F;
-            uint8_t timestamp_minute = (tx_timestamp >> 21) & 0x3F;
-            uint8_t timestamp_second = (tx_timestamp >> 15) & 0x3F;
-            uint16_t timestamp_ms = tx_timestamp & 0x3FF;
-
-            // LOG_INF("%02u:%02u:%02u.%03u %02u:%02u:%02u.%03u %s %u %u %u %u", 
-            //         current_hour, current_minute, current_second, current_ms,
-            //         timestamp_hour, timestamp_minute, timestamp_second, timestamp_ms, 
-            //         addr_str, number_press, tx_delay, latitude, longitude);
-
-            pkt.number_press = number_press;
-            pkt.tx_delay = tx_delay;
-            pkt.latitude = latitude;
-            pkt.longitude = longitude;
-            pkt.tx_hour = timestamp_hour;
-            pkt.tx_minute = timestamp_minute;
-            pkt.tx_second = timestamp_second;
-            pkt.tx_ms = timestamp_ms;
-            pkt.rx_hour = current_hour;
-            pkt.rx_minute = current_minute;
-            pkt.rx_second = current_second;
-            pkt.rx_ms = current_ms;
-            pkt.rssi = rssi;
-            pkt.aoi = duration_since_last_packet;
-            
-            #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-                // #if ROLE
-                    if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
-                        LOG_ERR("Message queue full. Dropping packet.");
+                // Calculate the duration since the last packet
+                uint32_t duration_since_last_packet = 0;
+                
+                if (last_packet_time != 0) {
+                    if (uptime >= last_packet_time) {
+                        duration_since_last_packet = uptime - last_packet_time;
+                    } else {
+                        // Handle wrap-around case for a 32-bit timestamp
+                        duration_since_last_packet = (UINT32_MAX - last_packet_time) + uptime + 1;
                     }
-                // #endif
-            #endif
+                }
+                last_packet_time = uptime; // Update the last packet time
+
+                uint16_t number_press = data.number_press[0];
+                uint16_t tx_delay = data.tx_delay[0];
+                uint32_t longitude = data.longitude[0];
+                uint32_t tx_timestamp = data.timestamp[0];
+
+                // Raw byte values for latitude
+                uint32_t raw_latitude[4];
+                memcpy(raw_latitude, &data.latitude[0], sizeof(raw_latitude));
+
+                // Print raw byte values of latitude
+                // LOG_INF("Raw Latitude Bytes: 0x%02X 0x%02X 0x%02X 0x%02X", raw_latitude[0], raw_latitude[1], raw_latitude[2], raw_latitude[3]);
+
+                // Convert raw bytes to uint32_t
+                uint32_t latitude = data.latitude[0];
+
+                uint8_t current_hour = (current_time >> 27) & 0x1F;
+                uint8_t current_minute = (current_time >> 21) & 0x3F;
+                uint8_t current_second = (current_time >> 15) & 0x3F;
+                uint16_t current_ms = current_time & 0x3FF;
+
+                uint8_t timestamp_hour = (tx_timestamp >> 27) & 0x1F;
+                uint8_t timestamp_minute = (tx_timestamp >> 21) & 0x3F;
+                uint8_t timestamp_second = (tx_timestamp >> 15) & 0x3F;
+                uint16_t timestamp_ms = tx_timestamp & 0x3FF;
+
+                // LOG_INF("%02u:%02u:%02u.%03u %02u:%02u:%02u.%03u %s %u %u %u %u", 
+                //         current_hour, current_minute, current_second, current_ms,
+                //         timestamp_hour, timestamp_minute, timestamp_second, timestamp_ms, 
+                //         addr_str, number_press, tx_delay, latitude, longitude);
+
+                pkt.number_press = number_press;
+                pkt.tx_delay = tx_delay;
+                pkt.latitude = latitude;
+                pkt.longitude = longitude;
+                pkt.tx_hour = timestamp_hour;
+                pkt.tx_minute = timestamp_minute;
+                pkt.tx_second = timestamp_second;
+                pkt.tx_ms = timestamp_ms;
+                pkt.rx_hour = current_hour;
+                pkt.rx_minute = current_minute;
+                pkt.rx_second = current_second;
+                pkt.rx_ms = current_ms;
+                pkt.rssi = rssi;
+                pkt.aoi = duration_since_last_packet;
+                
+                #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+                    #if ROLE
+                        if (k_msgq_put(&packet_msgq, &pkt, K_NO_WAIT) != 0) {
+                            LOG_ERR("Message queue full. Dropping packet.");
+                        }
+                    #endif
+                #endif
 
             } else {
                 // LOG_INF("Invalid manufacturer-specific data length\n");
@@ -253,15 +282,15 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
             }   
         }
 
-        if (name) {
-            free(name);
-            name = NULL;
-        }
+        // if (name) {
+        //     free(name);
+        //     name = NULL;
+        // }
     }
 }
 
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-    // #if ROLE
+    #if ROLE
         void append_null(void) {
             struct packet_data pkt;
             pkt = null_pkt;
@@ -319,5 +348,5 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
             k_msgq_purge(&packet_msgq); // Clears all pending messages in the queue
             LOG_INF("Packet message queue has been reset.");
         }
-    // #endif
+    #endif
 #endif
