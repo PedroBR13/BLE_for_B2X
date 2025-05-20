@@ -17,9 +17,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
             // #if ROLE
                 if (strncmp((char *)rx_buf, "SYNCi", 5) == 0) {
                     // LOG_INF("SYNC1 received from slave!");
-                    // uart_send("HELLO");
                     found = true;  // Set flag to indicate ACK received
-                    // wait_for_response("HELLO");
                 }
             // #endif
     
@@ -28,12 +26,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
                     // LOG_INF("HELLO received from master!");
                     uart_send("SYNCi");
                     synchronized = true;  // Set flag to indicate ACK received
-                    // wait_for_response("SYNC");
                 } 
-                // else if (strncmp((char *)rx_buf, "SYNC ", 4) == 0) {
-                //     // uart_send("SYNC");
-                //     LOG_INF("Synchronization Complete!");
-                // }
             #endif			
             }
             memset(rx_buf, 0, sizeof(rx_buf));  // Clear buffer	
@@ -65,11 +58,6 @@ void wait_for_response(const char *expected) {
     
     while (1) {
         k_sleep(K_MSEC(1));  // Small delay to avoid CPU overuse
-        // if (strncmp((char *)rx_buf, expected, strlen(expected)) == 0) {
-        //     LOG_INF("Response received: %s", rx_buf);
-        //     memset(rx_buf, 0, sizeof(rx_buf));  // Clear buffer after match
-        //     return;  // Exit loop once response is received
-        // }
         if (synchronized) {
             LOG_INF("Msg received!");
             synchronized = false;  // Reset flag for next use
@@ -97,10 +85,6 @@ void detect_slave(void) {
         
     }
     found = false;  // Reset flag for next use
-
-    // LOG_INF("Slave detected!");
-    // memset(rx_buf, 0, sizeof(rx_buf));  // Clear buffer
-    // uart_send("SYNC");
 }
 
 int uart_init(void) {

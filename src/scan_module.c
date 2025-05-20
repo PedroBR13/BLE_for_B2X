@@ -25,6 +25,7 @@ struct packet_data {
     uint32_t aoi;
 };
 
+// Marker packet 
 static struct packet_data null_pkt = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static struct packet_data error_pkt = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
@@ -71,18 +72,6 @@ static void parse_advertisement_data(const uint8_t *data, int len, char *name_bu
         const uint8_t *field_data = data + 2;
         int field_data_len = field_len - 1;
 
-        // if (field_type == BT_DATA_NAME_COMPLETE && *name == NULL) {  // Complete Local Name
-            // *name = (char *)malloc(field_data_len + 1);
-            // if (*name != NULL) {
-            //     memcpy(device_name_buffer, field_data, field_data_len);
-            //     (*name)[field_data_len] = '\0';
-            // } else {
-            //     LOG_ERR("Failed to allocate memory for device name");
-            // }
-
-            // memcpy(*name, field_data, field_data_len);
-            // (*name)[field_data_len] = '\0';  // Null-terminate the string
-        // }
         if (field_type == BT_DATA_NAME_COMPLETE && name_buf_size > 0 && name_buf[0] == '\0') {
             size_t copy_len = field_data_len < name_buf_size - 1 ? field_data_len : name_buf_size - 1;
             memcpy(name_buf, field_data, copy_len);
@@ -112,7 +101,6 @@ void reset_packet_received(void) {
 static uint32_t get_current_time_packed(void) {
     // Calculate runtime milliseconds since last update
     uint32_t runtime_ms = k_uptime_get() - rtc_time.last_runtime;
-    // LOG_INF("uptime: %llu - last_runtime: %u = %u", k_uptime_get(), rtc_time.last_runtime, runtime_ms);
     uint32_t total_ms = rtc_time.ms + runtime_ms;
 
     // Calculate the components of the current time
@@ -172,10 +160,6 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
     uint32_t current_time = get_current_time_packed();
     uint32_t uptime = k_uptime_get();
 
-    // Parse the advertisement data
-    // uint16_t *data = ad->data;
-    // int len = ad->len;
-    // char *name = NULL;
     char name_buf[32];  // Adjust size as needed
     const uint16_t *manufacturer_data = NULL;
     int manufacturer_data_len = 0;
@@ -289,6 +273,7 @@ void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct net_buf
     }
 }
 
+// Sdcard functions (different thread)
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
     #if ROLE
         void append_null(void) {

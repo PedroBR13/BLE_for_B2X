@@ -17,6 +17,7 @@ LOG_MODULE_REGISTER(main_logging, LOG_LEVEL_INF); // Register the logging module
 uint32_t runtime_ms = 0;
 uint32_t previous_runtime_ms = 0;
 
+// States 
 typedef enum {
     STATE_GNSS_SEARCH,
     STATE_SCANNING,
@@ -28,11 +29,6 @@ typedef enum {
 } app_state_t;
 
 static app_state_t current_state = STATE_DONE;  // Initialize to GNSS search state
-
-// static int time = 0;
-// static uint32_t start_time = 0;
-// static uint32_t elapsed_cycles = 0;
-// static uint32_t target_cycles = 0; 
 
 #if ROLE
 static uint8_t test_count = 0;
@@ -46,6 +42,7 @@ void error_callback(const char *error_message)
     current_state = STATE_NEW_TEST_FILE;
 }
 
+// configurations GPIOs, timers and synchronization
 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
 
         #define EXPECTED_PULSE_COUNT 10 
@@ -191,6 +188,7 @@ int main(void) {
     LOG_INF("Starting B2B device...");
 
     #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+        // initialize the GPIO pins
         int ret;
         if (!gpio_is_ready_dt(&led1)) {
             return 0;
@@ -225,7 +223,8 @@ int main(void) {
                 gpio_pin_configure_dt(&sync, GPIO_OUTPUT);
                 // Register the error callback with the SD card module
                 set_error_handler(error_callback);
-                
+
+                // Initialize the SD card
                 err = sdcard_init();
                 if (err) {
                     LOG_ERR("Failed to initialize SD Card, error: %d", err);
@@ -252,6 +251,7 @@ int main(void) {
         
     #endif
 
+    // Initialize the GNSS module
     // err = nrf_modem_lib_init();
     // if (err) {
     //     LOG_ERR("Failed to initialize modem, error: %d", err);
@@ -272,11 +272,7 @@ int main(void) {
                 break;
 
             case STATE_SCANNING:
-                // Initialize and start Bluetooth scanning
-                // time = k_uptime_get();
-                // start_time = k_cycle_get_32(); // Get CPU cycle count
-                // int scan_duration = 0;
-                // LOG_INF("Starting scan: %d", k_uptime_get());
+                
                 reset_packet_received();
                 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                     ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
@@ -285,6 +281,7 @@ int main(void) {
                     }
                 #endif
 
+                // Initialize and start Bluetooth scanning
                 err = ble_start_scanning();
                 if (err) {
                     LOG_ERR("BLE scanning start failed");
@@ -310,16 +307,6 @@ int main(void) {
                         }
                     #endif
                 }
-                // LOG_INF("Active scan: %d", k_uptime_get()-time1);
-
-                // LOG_INF("Stoppping scan: %d", k_uptime_get());
-                // int time2 = k_uptime_get();
-                // err = bt_le_scan_stop();
-                // if (err) {
-                //     LOG_ERR("Stopping scanning failed (err %d)\n", err);
-                //     return 0;
-                // }
-                // start_time = k_cycle_get_32(); // Get CPU cycle count
 
                 int err = bt_le_scan_stop();
                 if (err) {
@@ -327,33 +314,14 @@ int main(void) {
                     return 0;
                 }
 
-                // elapsed_cycles = k_cycle_get_32() - start_time;
-                // target_cycles = k_ms_to_cyc_ceil32(3); // Convert 1 ms to CPU cycles
-
-                // if (elapsed_cycles < target_cycles) {
-                //     k_busy_wait(((target_cycles - elapsed_cycles) * 1000000) / sys_clock_hw_cycles_per_sec());
-                // }
-
-                // LOG_INF("Scan stop duration: %d", k_uptime_get()-time2);
-
                 // Move to ADVERTISING state
                 if (current_state != STATE_NEW_TEST_FILE){
                     current_state = STATE_ADVERTISING;
                 }
 
-                // elapsed_cycles = k_cycle_get_32() - start_time - k_ms_to_cyc_ceil32(scan_duration-5);
-                // target_cycles = k_ms_to_cyc_ceil32(5); // Convert 1 ms to CPU cycles
-
-                // if (elapsed_cycles < target_cycles) {
-                //     k_busy_wait(((target_cycles - elapsed_cycles) * 1000000) / sys_clock_hw_cycles_per_sec());
-                // }
-
-                // LOG_INF("Scan duration: %d", k_uptime_get()-time);  
                 break;
 
             case STATE_ADVERTISING:
-                // LOG_INF("Starting beacon: %d", k_uptime_get());
-                // time = k_uptime_get();
                 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
                     ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);
                     if (ret < 0) {
@@ -390,8 +358,6 @@ int main(void) {
                     #endif
                 }
 
-                // LOG_INF("Beacon start duration: %d", k_uptime_get()-time);
-
                 // Wait here until advertising completes
                 while (!get_adv_progress()) {
                     k_sleep(K_MSEC(1)); // Small delay to avoid CPU overuse
@@ -406,6 +372,7 @@ int main(void) {
                 // LOG_INF("Advertising duration: %d", k_uptime_get()-time);   
                 break;
 
+            // Pins, LEDs and BLE initialization 
             case STATE_DONE:
                 // LOG_INF("Process done. Going to scanning state");
                 #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
@@ -443,6 +410,7 @@ int main(void) {
                 break;
             
             #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
+                // UART sychronization
                 case STATE_UART_SYNC:
                     LOG_INF("Start UART sychronization");
                     err = uart_init();
@@ -454,35 +422,9 @@ int main(void) {
                     #if ROLE
                         // **Keep sending "HELLO" until slave responds**
                         detect_slave();
-                        // uart_send("SYNC");
-                        // int i = 0;
-                        // while (i < EXPECTED_PULSE_COUNT) {
-                        //     k_sleep(K_MSEC(200));
-                        //     sync_pulse();
-                        //     i++;
-                        // }
                     #else
                         LOG_INF("Searching for master...");
                         wait_for_response("HELLO");
-                        // LOG_INF("Master found. Starting synchronization...");
-                        // while (!synchronized_done) {
-                        //     if (synchronized && pulse_count >= EXPECTED_PULSE_COUNT) {
-                        //         // After receiving 10 pulses, blink LED at the sync period frequency
-                        //         if (sync_period > 0) {
-                        //             // blink_led();
-                        //             // LOG_INF("Blinking LED at %u ms", sync_period);
-                        //             k_sleep(K_MSEC(sync_period));  // Sleep for the sync period to blink the LED
-                        //             synchronized_done=true;
-                        //         }
-                        //     } else {
-                        //         // If not yet synchronized, just wait
-                        //         k_sleep(K_MSEC(1));  // Sleep to avoid tight loop
-                        //     }
-                        // }
-                        // synchronized = false;  // Reset flag for next use
-                        // pulse_count = 0; // Reset pulse count for next use
-                        // sync_period = 0; // Reset sync period for next use
-                        // synchronized_done=false;
                     #endif
                     
                     #if NLOS_TEST
@@ -521,7 +463,6 @@ int main(void) {
                         LOG_ERR("Application init failed");
                         return err;
                     }
-                    // LOG_INF("App started");
 
                     // LOG_INF("Msg generation: %d ms / Number of copies: %d / Scan Window: %d ms / Test: %s / Time shift: %d ms / Role: %d", 
                     // INTERVAL, PACKET_COPIES,SCAN_WINDOW_MAIN,CSV_TEST_NAME, TEST_SHIFT,ROLE);
@@ -530,6 +471,7 @@ int main(void) {
                     break;
 
             // #if ROLE
+                // Add marker packet to the SD card and shift
                 case STATE_NEW_TEST_FILE:
                     #if ROLE
                     append_null();
@@ -562,11 +504,6 @@ int main(void) {
                     LOG_INF("New test started. Test count: %u \n", test_count);
                     #endif
 
-                    // err = application_init();
-                    // if (err) {
-                    //     LOG_ERR("Application init failed");
-                    //     return err;
-                    // }
                     current_state = STATE_UART_SYNC;
                     break;
                 // #endif

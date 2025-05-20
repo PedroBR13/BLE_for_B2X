@@ -40,6 +40,7 @@ static bool fix_drift = false;
 
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
 
+// Manufacturer Specific Data configuration
 static struct bt_le_ext_adv *adv_set;
 static const struct bt_data ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_NO_BREDR),
@@ -106,7 +107,7 @@ static uint32_t get_current_time_packed(void) {
     return packed_time;
 }
 
-// Function to generate and enqueue new packet data
+// Function to generate and enqueue new packet data - Appliocation layer
 static void delayed_packet_enqueue(struct k_work *work) {
     if (packet_pending) {
         // LOG_WRN("Packet dropped: A previous packet is still being processed.");
@@ -185,6 +186,7 @@ int advertising_module_init(void) {
 
     // LOG_INF("Initializing Advertising Module\n");
 
+    // Initialize the advertising data
     struct bt_le_adv_param adv_param = {
         .options = BT_LE_ADV_OPT_NONE,
         .interval_min = ADV_INTERVAL,
@@ -209,17 +211,11 @@ int advertising_start(bool null_packet) {
     }
     advertising_complete_flag = false;
 
+    // congfigure the advertising data's number of copies
     struct bt_le_ext_adv_start_param start_param = {
         .timeout = 0,
         .num_events = PACKET_COPIES
     };
-
-    // struct bt_le_adv_param adv_param = {
-    //     .options = BT_LE_ADV_OPT_NONE,
-    //     .interval_min = ADV_INTERVAL,
-    //     .interval_max = ADV_INTERVAL,
-    //     .peer = NULL,
-    // };
 
 
     // Update adv_mfg_data with the current packet content
@@ -272,6 +268,7 @@ int advertising_start(bool null_packet) {
         return err;
     }
 
+    // Start the advertising
     err = bt_le_ext_adv_start(adv_set, &start_param);
     if (err) {
         LOG_ERR("Failed to start advertising (err %d)", err);
