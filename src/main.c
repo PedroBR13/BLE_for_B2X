@@ -66,8 +66,8 @@ void error_callback(const char *error_message)
         static const struct gpio_dt_spec sync = GPIO_DT_SPEC_GET(SYNC_PIN, gpios);
         
         // Timers
+        static struct k_timer timeout_timer;
         #if ROLE
-            static struct k_timer timeout_timer;
             void sync_pulse(void) {
                 gpio_pin_toggle_dt(&sync);
                 gpio_pin_toggle_dt(&sync);
@@ -128,9 +128,9 @@ void error_callback(const char *error_message)
             k_timer_start(&led_timer, K_MSEC(100), K_NO_WAIT);  // Reset the timer (1 second)
         }
 
-        #if ROLE
+        // #if ROLE
             static bool first_test = true;
-        #endif
+        // #endif
 
         static bool recording_status = false;
 
@@ -166,11 +166,11 @@ void error_callback(const char *error_message)
             }
         }
 
-    #if ROLE
+    // #if ROLE
         static void timer_handler(struct k_timer *timer_id) {
             current_state = STATE_NEW_TEST_FILE; 
         }     
-    #endif
+    // #endif
 #endif
 
 
@@ -431,10 +431,13 @@ int main(void) {
                 }
                 
                 LOG_INF("Bluetooth initialized");
+                LOG_INF("Msg generation: %d ms / Number of copies: %d / Scan Window: %d ms / Test: %s / Time shift: %d ms / Role: %d", 
+                    INTERVAL, PACKET_COPIES,SCAN_WINDOW_MAIN,CSV_TEST_NAME, TEST_SHIFT,ROLE);
                 
                 #ifdef CONFIG_BOARD_NRF9160DK_NRF52840
                     current_state = STATE_SCANNING;
                 #else
+                    k_timer_init(&led_timer, led_off, NULL);
                     current_state = STATE_UART_SYNC;
                 #endif
                 break;
@@ -451,31 +454,35 @@ int main(void) {
                     #if ROLE
                         // **Keep sending "HELLO" until slave responds**
                         detect_slave();
-                        uart_send("SYNC");
-                        int i = 0;
-                        while (i < EXPECTED_PULSE_COUNT) {
-                            k_sleep(K_MSEC(200));
-                            sync_pulse();
-                            i++;
-                        }
+                        // uart_send("SYNC");
+                        // int i = 0;
+                        // while (i < EXPECTED_PULSE_COUNT) {
+                        //     k_sleep(K_MSEC(200));
+                        //     sync_pulse();
+                        //     i++;
+                        // }
                     #else
                         LOG_INF("Searching for master...");
-                        wait_for_response("SYNC");
-                        LOG_INF("Master found. Starting synchronization...");
-                        while (!synchronized_done) {
-                            if (synchronized && pulse_count >= EXPECTED_PULSE_COUNT) {
-                                // After receiving 10 pulses, blink LED at the sync period frequency
-                                if (sync_period > 0) {
-                                    // blink_led();
-                                    LOG_INF("Blinking LED at %u ms", sync_period);
-                                    k_sleep(K_MSEC(sync_period));  // Sleep for the sync period to blink the LED
-                                    synchronized_done=true;
-                                }
-                            } else {
-                                // If not yet synchronized, just wait
-                                k_sleep(K_MSEC(1));  // Sleep to avoid tight loop
-                            }
-                        }
+                        wait_for_response("HELLO");
+                        // LOG_INF("Master found. Starting synchronization...");
+                        // while (!synchronized_done) {
+                        //     if (synchronized && pulse_count >= EXPECTED_PULSE_COUNT) {
+                        //         // After receiving 10 pulses, blink LED at the sync period frequency
+                        //         if (sync_period > 0) {
+                        //             // blink_led();
+                        //             // LOG_INF("Blinking LED at %u ms", sync_period);
+                        //             k_sleep(K_MSEC(sync_period));  // Sleep for the sync period to blink the LED
+                        //             synchronized_done=true;
+                        //         }
+                        //     } else {
+                        //         // If not yet synchronized, just wait
+                        //         k_sleep(K_MSEC(1));  // Sleep to avoid tight loop
+                        //     }
+                        // }
+                        // synchronized = false;  // Reset flag for next use
+                        // pulse_count = 0; // Reset pulse count for next use
+                        // sync_period = 0; // Reset sync period for next use
+                        // synchronized_done=false;
                     #endif
                     
                     #if NLOS_TEST
@@ -485,13 +492,24 @@ int main(void) {
                     #endif
                     
                     #if !defined(CONFIG_BOARD_NRF9160DK_NRF52840)
-                        #if ROLE
+                        // #if ROLE
                             #if !(NLOS_TEST)
                                 k_timer_init(&timeout_timer, timer_handler, NULL);
-                                k_timer_start(&timeout_timer, K_SECONDS(RUNAWAY_PERIOD), K_SECONDS(TEST_PERIOD));
+                                // k_timer_start(&timeout_timer, K_SECONDS(RUNAWAY_PERIOD), K_SECONDS(TEST_PERIOD));
+                                #if ROLE
+                                if (first_test) {
+                                    first_test = false;
+                                } else {
+                                    LOG_INF("Time %u shift added",TEST_SHIFT*test_count);
+                                    // trigger_time_shift();
+                                    k_sleep(K_MSEC(TEST_SHIFT*test_count));
+                                }
+
+                                #endif
+                                k_timer_start(&timeout_timer, K_SECONDS(TEST_PERIOD), K_NO_WAIT);
                             #endif
-                        #endif
-                        k_timer_init(&led_timer, led_off, NULL);
+                        // #endif
+
                         gpio_pin_configure_dt(&led3, GPIO_OUTPUT_INACTIVE);
                     #endif
 
@@ -505,46 +523,53 @@ int main(void) {
                     }
                     // LOG_INF("App started");
 
-                    LOG_INF("Msg generation: %d ms / Number of copies: %d / Scan Window: %d ms / Test: %s / Time shift: %d ms / Role: %d", 
-                    INTERVAL, PACKET_COPIES,SCAN_WINDOW_MAIN,CSV_TEST_NAME, TEST_SHIFT,ROLE);
+                    // LOG_INF("Msg generation: %d ms / Number of copies: %d / Scan Window: %d ms / Test: %s / Time shift: %d ms / Role: %d", 
+                    // INTERVAL, PACKET_COPIES,SCAN_WINDOW_MAIN,CSV_TEST_NAME, TEST_SHIFT,ROLE);
 
                     current_state = STATE_SCANNING;
                     break;
 
-            #if ROLE
+            // #if ROLE
                 case STATE_NEW_TEST_FILE:
+                    #if ROLE
                     append_null();
                     reset_last_packet_time();
+                    #endif
+                    k_timer_stop(&timeout_timer);
 
-                    // err = application_stop();
-                    // if (err) {
-                    //     LOG_ERR("Application stop failed");
-                    //     return err;
-                    // }
-
-                    switch_recording(false);
-                    if (first_test) {
-                        first_test = false;
-                    } else {
-                        trigger_time_shift();
-                        LOG_INF("Time shift added at: %lld", k_uptime_get());
+                    err = application_stop();
+                    if (err) {
+                        LOG_ERR("Application stop failed");
+                        return err;
                     }
+                    #if ROLE
+                    switch_recording(false);
+                    // if (first_test) {
+                    //     first_test = false;
+                    // } else {
+                    //     trigger_time_shift();
+                    //     LOG_INF("Time shift added at: %lld", k_uptime_get());
+                    // }  
+                    #endif
+
                     
                     
                     
-                    // k_sleep(K_MSEC(TEST_SHIFT));
-                    switch_recording(true);
+                    
+                    #if ROLE
+                    // switch_recording(true);
                     test_count++;
                     LOG_INF("New test started. Test count: %u \n", test_count);
+                    #endif
 
                     // err = application_init();
                     // if (err) {
                     //     LOG_ERR("Application init failed");
                     //     return err;
                     // }
-                    current_state = STATE_SCANNING;
+                    current_state = STATE_UART_SYNC;
                     break;
-                #endif
+                // #endif
             #endif
 
 
